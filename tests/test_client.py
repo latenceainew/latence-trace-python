@@ -438,6 +438,8 @@ def test_client_validation_error_is_caught_locally() -> None:
 
 
 def test_sdk_contract_matches_manifest() -> None:
+    if not MANIFEST_PATH.exists():
+        pytest.skip(f"runtime manifest not available at {MANIFEST_PATH}")
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     with Latence(transport=_mock_transport(lambda _: httpx.Response(200, json={}))) as sync:
         assert missing_methods(

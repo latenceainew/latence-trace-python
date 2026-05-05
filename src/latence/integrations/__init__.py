@@ -7,6 +7,10 @@ never imports a framework you don't have installed:
 - ``latence.integrations.llama_index`` -> ``LatenceTracePostProcessor``
 - ``latence.integrations.openai`` -> ``wrap_openai_chat``
 
+Shared product-path dispatch lives in ``latence.integrations._trace``.
+Adapters use it to call ``client.grounding.rag`` / ``client.grounding.code``
+instead of carrying scoring logic per framework.
+
 Each module raises a helpful ``ImportError`` at import time if its
 optional extras are missing, so users see a clear "install
 ``latence[langchain]``" message instead of a cryptic

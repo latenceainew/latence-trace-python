@@ -35,6 +35,7 @@ except ImportError as exc:  # pragma: no cover - extras-only import
 
 from latence.client import Latence
 from latence.errors import LatenceTraceAPIError
+from latence.integrations import _trace
 from latence.models import (
     AttributionMode,
     ComplianceLabelMode,
@@ -74,7 +75,7 @@ class LatenceComplianceRedactor:
         text = inputs.get(self._text_key)
         if not isinstance(text, str) or not text:
             return inputs
-        result = self._client.redact_compliance(
+        result = self._client.privacy.redact(
             text=text,
             labels=self._labels,
             categories=self._categories,
@@ -177,7 +178,8 @@ class LatenceTraceCallback(BaseCallbackHandler):
             # than send a guaranteed unknown.
             return
         try:
-            result = self._client.score_groundedness(
+            result = _trace.score_rag(
+                self._client,
                 query=query,
                 response_text=response_text,
                 raw_context=context,
@@ -189,12 +191,7 @@ class LatenceTraceCallback(BaseCallbackHandler):
                 extra={"code": exc.code, "status": exc.status},
             )
             return
-        payload = {
-            "risk_band": result.risk_band.value,
-            "groundedness_v2": result.scores.groundedness_v2,
-            "coverage_score_u": result.scores.coverage_score_u,
-            "request_id": result.request_id,
-        }
+        payload = _trace.trace_metadata(result)
         self.last_result = payload
         outputs.setdefault("metadata", {})
         if isinstance(outputs["metadata"], dict):

@@ -1,0 +1,43 @@
+{
+  "name": "Latence TRACE Coding Check",
+  "nodes": [
+    {
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {}
+    },
+    {
+      "id": "trace-code",
+      "name": "TRACE Code Grounding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.LATENCE_TRACE_URL}}/groundedness",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"query_text\":\"Does this patch add retry handling?\",\"response_text\":\"It retries transient timeouts up to three times.\",\"raw_context\":\"def fetch_with_retry(client, url, attempts=3): ...\",\"scoring_mode\":\"code\"}"
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "TRACE Code Grounding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
+

@@ -1,0 +1,102 @@
+{
+  "name": "Latence TRACE Privacy Memory Rollup",
+  "nodes": [
+    {
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {}
+    },
+    {
+      "id": "trace-redact",
+      "name": "TRACE Redact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, -140],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.LATENCE_TRACE_URL}}/v1/compliance/redact",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"text\":\"Contact jane@example.com about account DE89370400440532013000.\",\"redact\":true,\"include_original_text\":false}"
+      }
+    },
+    {
+      "id": "trace-memory",
+      "name": "TRACE Memory Step",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 80],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.LATENCE_TRACE_URL}}/v1/memory/update",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"turn_text\":\"Keep manual refund approval as required context.\",\"prior_memory_state\":null}"
+      }
+    },
+    {
+      "id": "trace-rollup",
+      "name": "TRACE Rollup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.LATENCE_TRACE_URL}}/groundedness/rollup",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"turns\":[{\"risk_band\":\"amber\",\"runtime_decision\":{\"action\":\"review\"}}]}"
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "TRACE Redact",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "TRACE Memory Step",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TRACE Redact": {
+      "main": [
+        [
+          {
+            "node": "TRACE Rollup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TRACE Memory Step": {
+      "main": [
+        [
+          {
+            "node": "TRACE Rollup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
+

@@ -1,0 +1,43 @@
+{
+  "name": "Latence TRACE RAG Check",
+  "nodes": [
+    {
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {}
+    },
+    {
+      "id": "trace-rag",
+      "name": "TRACE RAG Grounding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.LATENCE_TRACE_URL}}/groundedness",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"query_text\":\"Can I promise the refund?\",\"response_text\":\"Yes, the refund will arrive within 48 hours.\",\"raw_context\":\"Refunds require manual finance approval before timelines are promised.\",\"context_trust_enabled\":true,\"scoring_mode\":\"rag\"}"
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "TRACE RAG Grounding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
+

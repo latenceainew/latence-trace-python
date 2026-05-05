@@ -19,6 +19,19 @@ This direct shape works cleanly in LangGraph nodes, LangChain callbacks,
 LlamaIndex postprocessors, n8n HTTP nodes, Cursor tools, Claude Code hooks,
 Codex workflows, and custom pipelines.
 
+## Integration Principle
+
+Integrations are inheritance layers over the SDK, not separate products.
+
+Every adapter must extract framework-native inputs, call one of the shared SDK
+product paths, and attach TRACE metadata back to the framework object. Adapters
+must not implement scoring, thresholds, retries, redaction semantics, memory
+rules, or policy decisions.
+
+Shared adapter behavior lives in `latence.integrations._trace` so framework
+wrappers automatically inherit new runtime fields, SDK fixes, and response
+metadata as the core product evolves.
+
 ## Optional Helpers
 
 Optional adapter modules live under `latence.integrations`:
@@ -47,7 +60,18 @@ Every adapter should do the same four things:
 1. Extract the user query or task.
 2. Extract the candidate model response.
 3. Extract retrieved context, code context, or tool evidence.
-4. Call `client.grounding.rag(...)` or `client.grounding.code(...)`.
+4. Call `client.grounding.rag(...)` or `client.grounding.code(...)` through the shared integration helper.
 
 Keep TRACE decisions explicit in your app state. That makes routing, logs,
 reviews, retries, and replay tests straightforward.
+
+## Phase 5 Demos
+
+The free checkpoint demos live in `examples/phase5/`:
+
+- LibreChat/OpenRouter proxy prototype.
+- Native SDK, LangChain, and LlamaIndex RAG comparison.
+- LangGraph coding-agent review/retry/pass route.
+- Importable n8n HTTP-node workflows.
+
+See [Phase 5 Integration Checkpoint](phase5_integration_checkpoint.md).

@@ -263,6 +263,9 @@ pip install "latence[haystack]"
 Docs: [Integrations](docs/integrations.md)  
 Example: [Async batch](examples/async_batch.py)
 
+Phase 5 demos: [LibreChat/OpenRouter, native SDK, LangChain, LlamaIndex,
+LangGraph, and n8n](examples/phase5/)
+
 ## Async
 
 ```python
@@ -335,6 +338,7 @@ from latence import LatenceTraceClient, AsyncLatenceTraceClient
 - [Quickstart](docs/quickstart.md)
 - [Sessions](docs/sessions.md)
 - [Integrations](docs/integrations.md)
+- [Phase 5 Integration Checkpoint](docs/phase5_integration_checkpoint.md)
 - [Errors](docs/errors.md)
 - [Publishing](docs/publishing.md)
 - [Examples](examples/)

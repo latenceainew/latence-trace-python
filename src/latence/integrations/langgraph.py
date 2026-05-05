@@ -44,7 +44,7 @@ from typing import Any
 
 from latence.client import Latence
 from latence.errors import LatenceTraceAPIError
-from latence.integrations import _band_utils
+from latence.integrations import _band_utils, _trace
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +52,7 @@ logger = logging.getLogger(__name__)
 def score_groundedness_node(
     client: Latence,
     *,
+    mode: _trace.TraceMode = "rag",
     profile: str = "standard",
     fail_band: str = "red",
     question_key: str = "question",
@@ -76,11 +77,13 @@ def score_groundedness_node(
             )
             return {**state, "trace_band": fail_band, "trace_score": 0.0}
         try:
-            response = client.score_groundedness(
+            response = _trace.score(
+                client,
+                mode=mode,
                 query=question,
                 response_text=answer,
-                raw_context=[raw_context] if isinstance(raw_context, str) else list(raw_context),
-                extra={"profile": profile} if profile else None,
+                raw_context=raw_context,
+                profile=profile,
             )
         except LatenceTraceAPIError as exc:
             logger.warning(
@@ -92,6 +95,7 @@ def score_groundedness_node(
             **state,
             "trace_band": _band_utils.resolve_band(response),
             "trace_score": _band_utils.resolve_score(response),
+            "latence_trace": _trace.trace_metadata(response),
             "trace_response": response,
         }
 

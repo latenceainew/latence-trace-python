@@ -30,6 +30,7 @@ except ImportError as exc:  # pragma: no cover - extras-only import
 
 from latence.client import Latence
 from latence.errors import LatenceTraceAPIError
+from latence.integrations import _trace
 from latence.models import AttributionMode, GroundednessResponse
 
 logger = logging.getLogger(__name__)
@@ -57,10 +58,11 @@ def score_openai_response(
     if not response_text:
         return None
     try:
-        return client.score_groundedness(
+        return _trace.score_rag(
+            client,
             query=query,
             response_text=response_text,
-            raw_context=list(raw_context) if raw_context else None,
+            raw_context=raw_context,
             attribution_mode=attribution_mode,
         )
     except LatenceTraceAPIError as exc:

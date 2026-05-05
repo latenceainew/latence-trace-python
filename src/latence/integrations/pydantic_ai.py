@@ -25,7 +25,7 @@ from typing import Any
 
 from latence.client import Latence
 from latence.errors import LatenceTraceAPIError
-from latence.integrations import _band_utils
+from latence.integrations import _band_utils, _trace
 
 logger = logging.getLogger(__name__)
 
@@ -52,11 +52,12 @@ def trace_result_validator(
             return result
         question = question_getter(ctx) if question_getter else None
         try:
-            response = client.score_groundedness(
+            response = _trace.score_rag(
+                client,
                 query=question,
                 response_text=result,
-                raw_context=[raw_context] if isinstance(raw_context, str) else list(raw_context),
-                extra={"profile": profile} if profile else None,
+                raw_context=raw_context,
+                profile=profile,
             )
         except LatenceTraceAPIError as exc:
             logger.warning(

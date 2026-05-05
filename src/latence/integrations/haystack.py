@@ -35,7 +35,7 @@ except ImportError as exc:  # pragma: no cover - extras-only import
 
 from latence.client import Latence
 from latence.errors import LatenceTraceAPIError
-from latence.integrations import _band_utils
+from latence.integrations import _band_utils, _trace
 
 logger = logging.getLogger(__name__)
 
@@ -71,13 +71,12 @@ class LatenceTraceScorer:
                 scored.append(payload)
                 continue
             try:
-                res = self._client.score_groundedness(
+                res = _trace.score_rag(
+                    self._client,
                     query=question,
                     response_text=response_text,
-                    raw_context=(
-                        [raw_context] if isinstance(raw_context, str) else list(raw_context)
-                    ),
-                    extra={"profile": self._profile} if self._profile else None,
+                    raw_context=raw_context,
+                    profile=self._profile,
                 )
             except LatenceTraceAPIError as exc:
                 logger.warning(
@@ -91,6 +90,7 @@ class LatenceTraceScorer:
                 {
                     "band": _band_utils.resolve_band(res),
                     "groundedness": _band_utils.resolve_score(res),
+                    "latence_trace": _trace.trace_metadata(res),
                     "response": res.model_dump() if hasattr(res, "model_dump") else dict(res),
                 }
             )

@@ -30,6 +30,7 @@ except ImportError as exc:  # pragma: no cover - extras-only import
 
 from latence.client import Latence
 from latence.errors import LatenceTraceAPIError
+from latence.integrations import _trace
 from latence.models import AttributionMode
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ class LatenceTracePostProcessor(BaseNodePostprocessor):
     that point -- instead we score the raw retrieved context against
     the (in-flight) query so callers see the *retrieval-side*
     groundedness budget. To score the synthesised output, call
-    ``Latence.score_groundedness`` from the response handler.
+    ``Latence.grounding.rag`` from the response handler.
     """
 
     client: Latence
@@ -75,7 +76,8 @@ class LatenceTracePostProcessor(BaseNodePostprocessor):
         if not context:
             return nodes
         try:
-            response = self.client.score_groundedness(
+            response = _trace.score_rag(
+                self.client,
                 query=query,
                 response_text=" ".join(context),
                 raw_context=context,
@@ -87,11 +89,7 @@ class LatenceTracePostProcessor(BaseNodePostprocessor):
                 extra={"code": exc.code, "status": exc.status},
             )
             return nodes
-        annotation = {
-            "risk_band": response.risk_band.value,
-            "coverage_score_u": response.scores.coverage_score_u,
-            "context_coverage_ratio": response.scores.context_coverage_ratio,
-        }
+        annotation = _trace.trace_metadata(response)
         for node in nodes:
             node.node.metadata.setdefault("latence_trace", annotation)
         return nodes

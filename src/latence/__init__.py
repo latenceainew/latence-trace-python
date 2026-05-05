@@ -49,7 +49,7 @@ from latence.sessions import (
     TraceSessionSnapshot,
 )
 
-__version__ = "1.0.0"
+__version__ = "0.1.4"
 
 __all__ = [
     "AsyncLatence",

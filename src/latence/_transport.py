@@ -24,7 +24,7 @@ from latence.errors import (
     _Envelope,
 )
 
-DEFAULT_USER_AGENT = "latence/1.0.0"
+DEFAULT_USER_AGENT = "latence/0.1.4"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 DEFAULT_MAX_RETRIES = 4
 RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})

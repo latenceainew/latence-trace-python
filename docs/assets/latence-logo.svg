@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 132 34" fill="none">
+  <defs>
+    <style>@import url('https://fonts.googleapis.com/css2?family=Raleway:wght@700&amp;display=swap');</style>
+  </defs>
+  <svg x="0" y="6.6" width="26.3" height="20.4" viewBox="13.2 17.4 37.6 29.2">
+    <path
+      d="M34.3 19.9 L20.3 44.1 L48.3 44.1 Z"
+      fill="none"
+      stroke="#00cfd1"
+      stroke-width="5"
+      stroke-linejoin="round"
+    />
+    <circle cx="15.7" cy="36" r="2.5" fill="#00cfd1" />
+    <circle cx="34.3" cy="36" r="2.5" fill="#00cfd1" />
+  </svg>
+  <text
+    x="30"
+    y="27"
+    font-family="Raleway, Arial, sans-serif"
+    font-weight="700"
+    font-size="28"
+    letter-spacing="-1.5"
+    fill="#0f172a"
+  >Latence</text>
+</svg>

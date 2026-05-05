@@ -56,9 +56,7 @@ class LatenceTracePostProcessor(BaseNodePostprocessor):
         *,
         attribution_mode: AttributionMode = AttributionMode.CLOSED_BOOK,
     ) -> None:
-        super().__init__()
-        object.__setattr__(self, "client", client)
-        object.__setattr__(self, "attribution_mode", attribution_mode)
+        super().__init__(client=client, attribution_mode=attribution_mode)
 
     @classmethod
     def class_name(cls) -> str:

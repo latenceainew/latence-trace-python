@@ -14,6 +14,7 @@ import random
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlparse
 
 from latence.errors import (
     LatenceTraceAPIError,
@@ -28,6 +29,13 @@ DEFAULT_USER_AGENT = "latence/0.1.4"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 DEFAULT_MAX_RETRIES = 4
 RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
+RUNPOD_PRODUCT_ACTIONS = {
+    "/groundedness": "score",
+    "/v1/compliance/redact": "redact",
+    "/v1/compression": "compress",
+    "/v1/memory/update": "memory.update",
+    "/groundedness/rollup": "rollup",
+}
 
 
 @dataclass(frozen=True)
@@ -163,14 +171,80 @@ def coerce_api_key(api_key: str | None) -> str | None:
     return api_key or os.environ.get("LATENCE_TRACE_API_KEY")
 
 
+def is_runpod_endpoint(base_url: str) -> bool:
+    """Return whether ``base_url`` points at a RunPod job endpoint.
+
+    Callers still use TRACE product namespaces; this flag only changes the
+    transport envelope inside the SDK.
+    """
+
+    parsed = urlparse(base_url)
+    path = parsed.path.rstrip("/")
+    deployment = os.environ.get("LATENCE_TRACE_DEPLOYMENT", "").strip().lower()
+    return deployment == "runpod" or path.endswith(("/runsync", "/run"))
+
+
+def runpod_request_body(
+    method: str,
+    path: str,
+    payload: Mapping[str, Any] | None,
+    headers: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Wrap a product-path request in RunPod's ``input`` envelope."""
+
+    normalized_path = "/" + path.lstrip("/")
+    body = dict(payload or {})
+    if method.upper() == "GET" and normalized_path in {"/healthz", "/readyz"}:
+        return {"input": {"health": True}}
+    action = RUNPOD_PRODUCT_ACTIONS.get(normalized_path)
+    if action is None:
+        raise LatenceTraceAPIError(
+            f"RunPod deployment does not expose SDK path {normalized_path}",
+            status=0,
+        )
+    body["action"] = action
+    if headers:
+        idempotency_key = headers.get("Idempotency-Key") or headers.get("idempotency-key")
+        if idempotency_key and "idempotency_key" not in body:
+            body["idempotency_key"] = idempotency_key
+    return {"input": body}
+
+
+def unwrap_runpod_response(body: Any) -> tuple[Any, str | None]:
+    """Extract the runtime payload from direct/local or hosted RunPod responses."""
+
+    if not isinstance(body, Mapping):
+        return body, None
+    request_id = body.get("id") if isinstance(body.get("id"), str) else None
+    output: Any = body
+    if "status" in body and ("output" in body or "error" in body):
+        status = str(body.get("status") or "").upper()
+        if status not in {"COMPLETED", "COMPLETED_WITH_ERRORS"}:
+            error = body.get("error") or body.get("output") or body
+            raise LatenceTraceAPIError(f"RunPod job {status.lower()}: {error}", status=0)
+        output = body.get("output")
+    if isinstance(output, Mapping):
+        if output.get("success") is False:
+            message = output.get("error") or output.get("message") or "RunPod job failed"
+            raise LatenceTraceAPIError(str(message), status=int(output.get("status_code") or 0))
+        result = output.get("result")
+        if isinstance(result, Mapping):
+            return result, request_id
+    return output, request_id
+
+
 __all__: Sequence[str] = (
     "DEFAULT_TIMEOUT_SECONDS",
     "DEFAULT_USER_AGENT",
+    "RUNPOD_PRODUCT_ACTIONS",
     "RetryPolicy",
     "RETRYABLE_STATUS",
     "coerce_api_key",
     "coerce_base_url",
     "decode_error",
     "default_headers",
+    "is_runpod_endpoint",
     "parse_retry_after",
+    "runpod_request_body",
+    "unwrap_runpod_response",
 )

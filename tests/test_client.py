@@ -323,6 +323,90 @@ def test_product_namespaces_route_to_canonical_paths() -> None:
     assert seen[4][1]["turns"] == [{"risk_band": "green"}]
 
 
+def test_runpod_deployment_mode_wraps_product_calls_in_sdk() -> None:
+    seen: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v2/endpoint/runsync"
+        body = json.loads(request.content)
+        seen.append(body["input"])
+        action = body["input"]["action"]
+        if action == "score":
+            return httpx.Response(
+                200,
+                json={"id": "job-score", "status": "COMPLETED", "output": SAMPLE_RESPONSE},
+            )
+        if action == "redact":
+            return httpx.Response(
+                200,
+                json={
+                    "id": "job-redact",
+                    "status": "COMPLETED",
+                    "output": {"success": True, "result": SAMPLE_COMPLIANCE_RESPONSE},
+                },
+            )
+        if action == "compress":
+            return httpx.Response(
+                200,
+                json={
+                    "id": "job-compress",
+                    "status": "COMPLETED",
+                    "output": {
+                        "success": True,
+                        "result": {"compressed_text": "short", "tokens_saved": 3},
+                    },
+                },
+            )
+        if action == "memory.update":
+            return httpx.Response(
+                200,
+                json={
+                    "id": "job-memory",
+                    "status": "COMPLETED",
+                    "output": {
+                        "success": True,
+                        "result": {"next_memory_state": {"turn_index": 1}},
+                    },
+                },
+            )
+        if action == "rollup":
+            return httpx.Response(
+                200,
+                json={
+                    "id": "job-rollup",
+                    "status": "COMPLETED",
+                    "output": {"success": True, "result": {"turn_count": 1}},
+                },
+            )
+        raise AssertionError(f"unexpected RunPod action {action}")
+
+    with Latence(
+        base_url="https://api.runpod.ai/v2/endpoint/runsync",
+        transport=_mock_transport(handler),
+    ) as client:
+        rag = client.grounding.rag(response_text="x", raw_context=["y"])
+        redacted = client.privacy.redact(text="Contact jane@example.com", labels=["email"])
+        compressed = client.compression.messages([{"role": "user", "content": "hello"}])
+        memory = client.memory.step(turn_text="remember this", idempotency_key="mem-1")
+        rollup = client.rollup([{"risk_band": "green"}])
+
+    assert rag.request_id == "job-score"
+    assert redacted.request_id == "job-redact"
+    assert compressed.request_id == "job-compress"
+    assert memory.request_id == "job-memory"
+    assert rollup["request_id"] == "job-rollup"
+    assert [item["action"] for item in seen] == [
+        "score",
+        "redact",
+        "compress",
+        "memory.update",
+        "rollup",
+    ]
+    assert seen[0]["scoring_mode"] == "rag"
+    assert seen[2]["messages"] == [{"role": "user", "content": "hello"}]
+    assert seen[3]["idempotency_key"] == "mem-1"
+
+
 def test_sdk_managed_session_round_trips_memory_state() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/v1/memory/update"

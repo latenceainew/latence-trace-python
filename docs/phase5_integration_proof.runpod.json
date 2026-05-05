@@ -1,0 +1,60 @@
+{
+  "run_at": "2026-05-05T10:32:54Z",
+  "endpoint": "https://api.runpod.ai/v2/campegd1dctnx2/runsync",
+  "checks": [
+    {
+      "name": "native SDK RAG",
+      "ok": true,
+      "note": "",
+      "skipped": false
+    },
+    {
+      "name": "native SDK code",
+      "ok": true,
+      "note": "",
+      "skipped": false
+    },
+    {
+      "name": "native SDK privacy",
+      "ok": true,
+      "note": "",
+      "skipped": false
+    },
+    {
+      "name": "native SDK memory",
+      "ok": true,
+      "note": "",
+      "skipped": false
+    },
+    {
+      "name": "native SDK rollup",
+      "ok": true,
+      "note": "",
+      "skipped": false
+    },
+    {
+      "name": "LangGraph code node",
+      "ok": true,
+      "note": "band=red",
+      "skipped": false
+    },
+    {
+      "name": "LangChain RAG callback",
+      "ok": true,
+      "note": "band=amber",
+      "skipped": false
+    },
+    {
+      "name": "LlamaIndex postprocessor",
+      "ok": true,
+      "note": "band=green",
+      "skipped": false
+    },
+    {
+      "name": "n8n HTTP workflows",
+      "ok": true,
+      "note": "skipped by --sdk-only",
+      "skipped": true
+    }
+  ]
+}

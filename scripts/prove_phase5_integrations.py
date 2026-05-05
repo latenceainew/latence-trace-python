@@ -57,16 +57,24 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         default=ROOT / "docs/phase5_integration_proof.json",
     )
+    parser.add_argument(
+        "--sdk-only",
+        action="store_true",
+        help="Skip raw HTTP/n8n checks; prove only SDK-backed native/framework paths.",
+    )
     args = parser.parse_args(argv)
 
     checks = Check()
-    trace = Latence()
+    trace = Latence(timeout=float(os.environ.get("LATENCE_TRACE_TIMEOUT", "600")))
 
     check_native(trace, checks)
     check_langgraph(trace, checks)
     check_langchain(trace, checks)
     check_llamaindex(trace, checks)
-    check_n8n_http(checks)
+    if args.sdk_only:
+        checks.record("n8n HTTP workflows", True, "skipped by --sdk-only", skipped=True)
+    else:
+        check_n8n_http(checks)
 
     payload = {
         "run_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),

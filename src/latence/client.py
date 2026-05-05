@@ -22,7 +22,10 @@ from latence._transport import (
     coerce_base_url,
     decode_error,
     default_headers,
+    is_runpod_endpoint,
     parse_retry_after,
+    runpod_request_body,
+    unwrap_runpod_response,
 )
 from latence.errors import (
     LatenceTraceAPIError,
@@ -296,6 +299,7 @@ class Latence:
         self._api_key = coerce_api_key(api_key)
         self._retry = retry_policy or RetryPolicy()
         self._headers = default_headers(self._api_key, headers)
+        self._runpod = is_runpod_endpoint(self._base_url)
         self._client = httpx.Client(
             base_url=self._base_url,
             timeout=timeout,
@@ -532,7 +536,16 @@ class Latence:
         last_error: Exception | None = None
         while True:
             try:
-                response = self._client.request(method, path, json=json, headers=headers)
+                request_path = self._base_url if self._runpod else path
+                request_json = (
+                    runpod_request_body(method, path, json, headers) if self._runpod else json
+                )
+                response = self._client.request(
+                    "POST" if self._runpod else method,
+                    request_path,
+                    json=request_json,
+                    headers=headers,
+                )
             except httpx.TimeoutException as exc:
                 last_error = LatenceTraceTimeout(str(exc))
                 if attempt >= self._retry.max_retries:
@@ -554,13 +567,16 @@ class Latence:
 
             raise self._error_from_response(response)
 
-    @staticmethod
     def _parse_success(
+        self,
         response: httpx.Response,
         expected_model: type[BaseModel] | None,
     ) -> Any:
         request_id = response.headers.get("x-request-id")
         body = response.json()
+        if self._runpod:
+            body, runpod_request_id = unwrap_runpod_response(body)
+            request_id = request_id or runpod_request_id
         if expected_model is None:
             if isinstance(body, dict) and request_id and "request_id" not in body:
                 body = {**body, "request_id": request_id}

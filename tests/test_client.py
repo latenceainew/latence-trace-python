@@ -615,3 +615,348 @@ async def test_async_client_retries_on_500() -> None:
     ) as client:
         await client.score_groundedness(response_text="x", raw_context=["y"])
     assert counter["n"] == 2
+
+
+# ---------------------------------------------------------------------------
+# Alignment regressions for the latence-trace 0.5.x runtime / 0.1.5 SDK bump.
+# ---------------------------------------------------------------------------
+
+
+def test_runpod_handler_error_envelope_with_error_code_is_decoded() -> None:
+    """RunPod's ``_service_error_payload`` uses ``error_code``/``error``.
+
+    Older SDKs only looked at ``code``/``message`` and so degraded the
+    surfaced message to ``HTTP {status}``; we now accept both shapes.
+    """
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            500,
+            json={
+                "success": False,
+                "error_code": "service_error",
+                "error": "downstream blew up",
+                "hint": "retry in 60s",
+                "status_code": 500,
+                "docs_url": "https://docs.latence.ai/errors",
+            },
+        )
+
+    with Latence(
+        transport=_mock_transport(handler),
+        retry_policy=RetryPolicy(max_retries=0, base_seconds=0.0, cap_seconds=0.01),
+    ) as client:
+        with pytest.raises(Exception) as excinfo:
+            client.score_groundedness(response_text="x", raw_context=["y"])
+    err = excinfo.value
+    assert getattr(err, "code", None) == "service_error"
+    assert "downstream blew up" in str(err)
+    assert getattr(err, "hint", None) == "retry in 60s"
+
+
+def test_validation_422_with_detail_list_surfaces_useful_message() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            422,
+            json={
+                "detail": [
+                    {
+                        "type": "missing",
+                        "loc": ["body", "response_text"],
+                        "msg": "Field required",
+                    }
+                ]
+            },
+        )
+
+    with Latence(transport=_mock_transport(handler)) as client:
+        with pytest.raises(LatenceTraceValidationError) as excinfo:
+            # Bypass the client-side validator with a server-side 422 path.
+            client._request("POST", "/groundedness", json={"raw_context": "x"})
+    msg = str(excinfo.value)
+    assert "body.response_text" in msg
+    assert "Field required" in msg
+
+
+def test_language_alias_is_serialized_as_language() -> None:
+    seen: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return httpx.Response(200, json=SAMPLE_RESPONSE)
+
+    with Latence(transport=_mock_transport(handler)) as client:
+        client.score_groundedness(
+            response_text="x", raw_context=["y"], language="de"
+        )
+        client.score_groundedness(
+            response_text="x", raw_context=["y"], locale="en"
+        )
+
+    assert seen[0]["language"] == "de"
+    assert "locale" not in seen[0]
+    assert seen[1]["language"] == "en"
+    assert "locale" not in seen[1]
+
+
+def test_language_and_locale_conflict_rejected() -> None:
+    with Latence(transport=_mock_transport(lambda _: httpx.Response(200, json={}))) as client:
+        with pytest.raises(LatenceTraceValidationError):
+            client.score_groundedness(
+                response_text="x",
+                raw_context=["y"],
+                language="de",
+                locale="en",
+            )
+
+
+def test_first_class_kwargs_make_it_to_the_wire() -> None:
+    seen: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return httpx.Response(200, json=SAMPLE_RESPONSE)
+
+    with Latence(transport=_mock_transport(handler)) as client:
+        client.score_groundedness(
+            response_text="x",
+            raw_context=["y"],
+            profile="quality",
+            response_format="canonical",
+            include_triangular_diagnostics=True,
+            evidence_limit=5,
+            heatmap_format="span",
+            auto_decide=True,
+        )
+
+    body = seen[0]
+    assert body["profile"] == "quality"
+    assert body["response_format"] == "canonical"
+    assert body["include_triangular_diagnostics"] is True
+    assert body["evidence_limit"] == 5
+    assert body["heatmap_format"] == "span"
+    assert body["auto_decide"] is True
+
+
+def test_runpod_default_response_format_is_canonical() -> None:
+    seen: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        seen.append(body["input"])
+        return httpx.Response(
+            200,
+            json={"id": "j", "status": "COMPLETED", "output": SAMPLE_RESPONSE},
+        )
+
+    with Latence(
+        base_url="https://api.runpod.ai/v2/endpoint/runsync",
+        transport=_mock_transport(handler),
+    ) as client:
+        client.grounding.rag(response_text="x", raw_context=["y"])
+        client.grounding.rag(
+            response_text="x", raw_context=["y"], response_format="compact"
+        )
+
+    assert seen[0]["response_format"] == "canonical"
+    assert seen[1]["response_format"] == "compact"
+
+
+def test_rest_does_not_force_response_format_default() -> None:
+    seen: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return httpx.Response(200, json=SAMPLE_RESPONSE)
+
+    with Latence(transport=_mock_transport(handler)) as client:
+        client.score_groundedness(response_text="x", raw_context=["y"])
+
+    assert "response_format" not in seen[0]
+
+
+def test_rollup_normalizes_runpod_envelope_into_metrics_dict() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        assert body["input"]["action"] == "rollup"
+        return httpx.Response(
+            200,
+            json={
+                "id": "job-rollup",
+                "status": "COMPLETED",
+                "output": {
+                    "success": True,
+                    "result": {
+                        "success": True,
+                        "action": "rollup",
+                        "version": "0.5.0",
+                        "rollup": {
+                            "turns": 3,
+                            "noise_pct": 0.1,
+                            "model_drift_pct": 0.2,
+                            "retrieval_waste_pct": 0.05,
+                            "session_id": "s1",
+                        },
+                    },
+                },
+            },
+        )
+
+    with Latence(
+        base_url="https://api.runpod.ai/v2/endpoint/runsync",
+        transport=_mock_transport(handler),
+    ) as client:
+        plain = client.rollup([{"risk_band": "green"}])
+        typed = client.rollup([{"risk_band": "green"}], as_model=True)
+
+    assert plain["turns"] == 3
+    assert plain["session_id"] == "s1"
+    assert typed.turns == 3
+    assert typed.session_id == "s1"
+    assert typed.noise_pct == 0.1
+
+
+def test_rollup_typed_model_works_for_rest() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "turns": 2,
+                "noise_pct": 0.0,
+                "session_id": "rest-1",
+                "recommendations": ["rerank top-k"],
+            },
+        )
+
+    with Latence(transport=_mock_transport(handler)) as client:
+        result = client.rollup([{"risk_band": "amber"}], as_model=True)
+
+    assert result.turns == 2
+    assert result.session_id == "rest-1"
+    assert result.recommendations == ["rerank top-k"]
+
+
+def test_typed_runtime_decision_picks_up_band_and_reason_codes() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "risk_band": "red",
+                "scores": {"groundedness_v2": 0.4, "risk_band": "red"},
+                "runtime_decision": {
+                    "policy_version": "optimized_v1_plus_calibrator",
+                    "policy_sha256": "abc123",
+                    "head_id": "claim_decomposer",
+                    "head_version": "1.0",
+                    "head_registry_sha256": "def456",
+                    "class_key": "rag.prose.multi_claim",
+                    "score": 0.4,
+                    "score_channel": "head:claim_decomposer",
+                    "band": "red",
+                    "action": "block",
+                    "reason_codes": [
+                        "calibration_band_coercion:red",
+                        "head:claim_decomposer.below_block_threshold",
+                    ],
+                    "evidence": [
+                        {"index": 0, "support_id": "s0", "coverage_score": 0.3},
+                    ],
+                    "unsupported_spans": [
+                        {"token_index": 12, "token": "Verwandlung", "heatmap_score": 0.1},
+                    ],
+                    "allow_threshold": 0.997,
+                    "block_threshold": 0.014,
+                    "rollback_safe": True,
+                },
+            },
+        )
+
+    with Latence(transport=_mock_transport(handler)) as client:
+        result = client.score_groundedness(response_text="x", raw_context=["y"])
+
+    rd = result.runtime_decision
+    assert rd is not None
+    assert rd.band == "red"
+    assert rd.policy_version == "optimized_v1_plus_calibrator"
+    assert rd.policy_sha256 == "abc123"
+    assert rd.head_registry_sha256 == "def456"
+    assert "calibration_band_coercion:red" in rd.reason_codes
+    assert rd.evidence[0].support_id == "s0"
+    assert rd.unsupported_spans[0].token == "Verwandlung"
+    assert rd.allow_threshold == 0.997
+    assert rd.block_threshold == 0.014
+    assert rd.rollback_safe is True
+
+
+def test_typed_groundedness_scores_typed_fields_are_populated() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "risk_band": "red",
+                "scores": {
+                    "primary_name": "fused",
+                    "primary_score": 0.83,
+                    "groundedness_v2": 0.83,
+                    "nli_aggregate": 0.38,
+                    "reverse_context": 0.91,
+                    "context_coverage_ratio": 0.4,
+                    "context_attribution_ratio": 0.25,
+                    "context_usage_ratio": 0.16,
+                    "context_unused_ratio": 0.84,
+                    "support_units_used": 4,
+                    "support_units_total": 24,
+                    "risk_band": "red",
+                },
+            },
+        )
+
+    with Latence(transport=_mock_transport(handler)) as client:
+        result = client.score_groundedness(response_text="x", raw_context=["y"])
+
+    s = result.scores
+    assert s.primary_name == "fused"
+    assert s.primary_score == 0.83
+    assert s.groundedness_v2 == 0.83
+    assert s.nli_aggregate == 0.38
+    assert s.reverse_context == 0.91
+    assert s.context_usage_ratio == 0.16
+    assert s.context_unused_ratio == 0.84
+    assert s.support_units_used == 4
+    assert s.support_units_total == 24
+
+
+def test_compact_runpod_response_promotes_band_and_score() -> None:
+    """RunPod's compact lane emits top-level ``band`` / ``score``.
+
+    Verify the typed ``risk_band`` validator backfill picks them up
+    when ``scores.risk_band`` is missing (compact responses do not
+    include the nested ``scores`` block).
+    """
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "id": "j",
+                "status": "COMPLETED",
+                "output": {
+                    "band": "amber",
+                    "score": 0.62,
+                    "groundedness_v2": 0.62,
+                    "request_id": "compact-1",
+                },
+            },
+        )
+
+    with Latence(
+        base_url="https://api.runpod.ai/v2/endpoint/runsync",
+        transport=_mock_transport(handler),
+    ) as client:
+        result = client.grounding.rag(response_text="x", raw_context=["y"])
+
+    assert result.risk_band is not None
+    assert result.risk_band.value == "amber"
+    assert result.band == "amber"
+    assert result.score == 0.62
+    assert result.groundedness_v2 == 0.62

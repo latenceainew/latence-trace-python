@@ -25,7 +25,7 @@ from latence.errors import (
     _Envelope,
 )
 
-DEFAULT_USER_AGENT = "latence/0.1.4"
+DEFAULT_USER_AGENT = "latence/0.1.5"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 DEFAULT_MAX_RETRIES = 4
 RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
@@ -106,7 +106,24 @@ def parse_retry_after(value: str | None) -> float | None:
 
 def decode_error(status: int, body: Any, request_id: str | None) -> LatenceTraceAPIError:
     envelope = _envelope_from_body(body)
-    message = envelope.message if envelope and envelope.message else f"HTTP {status}"
+    if envelope and envelope.message:
+        message = envelope.message
+    elif status == 422 and isinstance(body, Mapping) and isinstance(body.get("detail"), list):
+        # FastAPI validator errors — the detail is a list of error dicts.
+        # Surface a useful message instead of the generic ``HTTP 422``.
+        details = body["detail"]
+        head = details[0] if details else None
+        if isinstance(head, Mapping):
+            loc = head.get("loc")
+            msg = head.get("msg") or "validation error"
+            location = ".".join(str(item) for item in loc) if isinstance(loc, list) else None
+            message = (
+                f"validation error at {location}: {msg}" if location else f"validation error: {msg}"
+            )
+        else:
+            message = f"validation error: {details!r}"
+    else:
+        message = f"HTTP {status}"
     if status in (401, 402, 403):
         return LatenceTraceAuthError(
             message,
@@ -138,27 +155,59 @@ def decode_error(status: int, body: Any, request_id: str | None) -> LatenceTrace
     return LatenceTraceAPIError(message, status=status, envelope=envelope, request_id=request_id)
 
 
+_ERROR_ENVELOPE_RESERVED = frozenset(
+    {"code", "message", "hint", "docs_url", "error_code", "error", "status_code"}
+)
+
+
 def _envelope_from_body(body: Any) -> _Envelope | None:
+    """Coerce a server error body into a structured :class:`_Envelope`.
+
+    Recognises three wire shapes:
+
+    1. FastAPI ``{"detail": {"code": ..., "message": ..., "hint": ...}}``
+       — the canonical REST error envelope.
+    2. RunPod handler ``{"success": false, "error_code": ..., "error":
+       ..., "hint": ..., "status_code": ..., "docs_url": ...}`` —
+       emitted by ``runpod/handler.py::_service_error_payload`` when a
+       job fails. The handler does not use ``code``/``message``;
+       prior SDK versions would silently fall through to the
+       ``HTTP {status}`` placeholder.
+    3. FastAPI ``{"detail": "<plain string>"}`` — degraded path; we
+       keep ``code=None`` and stuff the string into ``message`` so
+       callers still get a useful description.
+    """
+
     if not isinstance(body, Mapping):
         return None
     detail = body.get("detail")
     if isinstance(detail, Mapping):
         body = detail
+    elif isinstance(detail, str) and detail:
+        return _Envelope(code="error", message=detail, hint=None, docs_url=None, extra={})
     if not isinstance(body, Mapping):
         return None
-    code = body.get("code")
-    if not isinstance(code, str):
+
+    # Accept either ``code`` (REST) or ``error_code`` (RunPod handler).
+    code_value = body.get("code")
+    if not isinstance(code_value, str):
+        code_value = body.get("error_code")
+    # Accept either ``message`` (REST) or ``error`` (RunPod handler).
+    message_value = body.get("message")
+    if not isinstance(message_value, str) or not message_value:
+        message_value = body.get("error")
+
+    # Bail when neither code nor message is present — there is no
+    # structured envelope to surface.
+    if not isinstance(code_value, str) and not isinstance(message_value, str):
         return None
+
     return _Envelope(
-        code=code,
-        message=str(body.get("message") or ""),
+        code=str(code_value) if isinstance(code_value, str) else "error",
+        message=str(message_value) if isinstance(message_value, str) else "",
         hint=body.get("hint") if isinstance(body.get("hint"), str) else None,
         docs_url=body.get("docs_url") if isinstance(body.get("docs_url"), str) else None,
-        extra={
-            k: v
-            for k, v in body.items()
-            if k not in {"code", "message", "hint", "docs_url"}
-        },
+        extra={k: v for k, v in body.items() if k not in _ERROR_ENVELOPE_RESERVED},
     )
 
 

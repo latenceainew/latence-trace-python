@@ -26,6 +26,7 @@ from latence._transport import (
     runpod_request_body,
     unwrap_runpod_response,
 )
+from latence.client import _build_groundedness_payload, _normalize_rollup_body
 from latence.errors import (
     LatenceTraceAPIError,
     LatenceTraceRateLimited,
@@ -41,9 +42,9 @@ from latence.models import (
     ComplianceRedactionRequest,
     ComplianceRedactionResponse,
     CompressionResponse,
-    GroundednessRequest,
     GroundednessResponse,
     MemoryUpdateResponse,
+    RollupResponse,
     SupportUnit,
 )
 from latence.sessions import (
@@ -344,10 +345,18 @@ class AsyncLatence:
         coverage_threshold: float | None = None,
         raw_context_chunk_tokens: int | None = None,
         response_chunk_tokens: int | None = None,
+        language: str | None = None,
         locale: str | None = None,
         context_trust_enabled: bool = True,
         runtime_head_features: Mapping[str, float] | None = None,
         trajectory_features: Mapping[str, float] | None = None,
+        profile: str | None = None,
+        scoring_mode: str | None = None,
+        response_format: str | None = None,
+        include_triangular_diagnostics: bool | None = None,
+        evidence_limit: int | None = None,
+        heatmap_format: str | None = None,
+        auto_decide: bool | None = None,
         extra: Mapping[str, Any] | None = None,
     ) -> GroundednessResponse:
         payload = self._build_payload(
@@ -361,10 +370,18 @@ class AsyncLatence:
             coverage_threshold=coverage_threshold,
             raw_context_chunk_tokens=raw_context_chunk_tokens,
             response_chunk_tokens=response_chunk_tokens,
+            language=language,
             locale=locale,
             context_trust_enabled=context_trust_enabled,
             runtime_head_features=runtime_head_features,
             trajectory_features=trajectory_features,
+            profile=profile,
+            scoring_mode=scoring_mode,
+            response_format=response_format,
+            include_triangular_diagnostics=include_triangular_diagnostics,
+            evidence_limit=evidence_limit,
+            heatmap_format=heatmap_format,
+            auto_decide=auto_decide,
             extra=extra,
         )
         return await self._request(
@@ -428,14 +445,20 @@ class AsyncLatence:
     async def rollup(
         self,
         turns: Sequence[Mapping[str, Any]],
+        *,
+        as_model: bool = False,
         **options: Any,
-    ) -> Mapping[str, Any]:
-        return await self._request(
+    ) -> RollupResponse | Mapping[str, Any]:
+        body = await self._request(
             "POST",
             "/groundedness/rollup",
             json={"turns": list(turns), **options},
             expected_model=None,
         )
+        normalized = _normalize_rollup_body(body)
+        if as_model:
+            return RollupResponse.model_validate({**normalized, "raw": body})
+        return normalized
 
     def session(
         self,
@@ -470,48 +493,46 @@ class AsyncLatence:
         coverage_threshold: float | None,
         raw_context_chunk_tokens: int | None,
         response_chunk_tokens: int | None,
+        language: str | None,
         locale: str | None,
         context_trust_enabled: bool,
         runtime_head_features: Mapping[str, float] | None,
         trajectory_features: Mapping[str, float] | None,
+        profile: str | None,
+        scoring_mode: str | None,
+        response_format: str | None,
+        include_triangular_diagnostics: bool | None,
+        evidence_limit: int | None,
+        heatmap_format: str | None,
+        auto_decide: bool | None,
         extra: Mapping[str, Any] | None,
     ) -> dict:
-        normalised_units: list[dict] | None = None
-        if support_units:
-            normalised_units = [
-                u.model_dump(exclude_none=True) if isinstance(u, SupportUnit) else dict(u)
-                for u in support_units
-            ]
-        try:
-            req = GroundednessRequest(
-                query_text=query,
-                response_text=response_text,
-                chunk_ids=list(chunk_ids) if chunk_ids else None,
-                raw_context=_coerce_raw_context(raw_context),
-                support_units=(
-                    [SupportUnit(**u) for u in normalised_units]
-                    if normalised_units
-                    else None
-                ),
-                attribution_mode=attribution_mode,
-                primary_metric=primary_metric,
-                coverage_threshold=coverage_threshold,
-                raw_context_chunk_tokens=raw_context_chunk_tokens,
-                response_chunk_tokens=response_chunk_tokens,
-                locale=locale,
-                context_trust_enabled=context_trust_enabled,
-                runtime_head_features=runtime_head_features,
-                trajectory_features=trajectory_features,
-            )
-        except ValidationError as exc:
-            raise LatenceTraceValidationError(
-                f"client-side request validation failed: {exc.errors()[:3]}",
-                status=422,
-            ) from exc
-        body = req.model_dump(mode="json", exclude_none=True)
-        if extra:
-            body.update(dict(extra))
-        return body
+        return _build_groundedness_payload(
+            runpod=self._runpod,
+            response_text=response_text,
+            query=query,
+            chunk_ids=chunk_ids,
+            raw_context=raw_context,
+            support_units=support_units,
+            attribution_mode=attribution_mode,
+            primary_metric=primary_metric,
+            coverage_threshold=coverage_threshold,
+            raw_context_chunk_tokens=raw_context_chunk_tokens,
+            response_chunk_tokens=response_chunk_tokens,
+            language=language,
+            locale=locale,
+            context_trust_enabled=context_trust_enabled,
+            runtime_head_features=runtime_head_features,
+            trajectory_features=trajectory_features,
+            profile=profile,
+            scoring_mode=scoring_mode,
+            response_format=response_format,
+            include_triangular_diagnostics=include_triangular_diagnostics,
+            evidence_limit=evidence_limit,
+            heatmap_format=heatmap_format,
+            auto_decide=auto_decide,
+            extra=extra,
+        )
 
     async def _request(
         self,

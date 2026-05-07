@@ -45,6 +45,7 @@ from latence.models import (
     GroundednessRequest,
     GroundednessResponse,
     MemoryUpdateResponse,
+    RollupResponse,
     SupportUnit,
 )
 from latence.sessions import (
@@ -66,6 +67,148 @@ def _coerce_raw_context(raw_context: RawContextInput | None) -> str | None:
     if isinstance(raw_context, str):
         return raw_context
     return "\n\n".join(str(item) for item in raw_context)
+
+
+_ROLLUP_KNOWN_KEYS = frozenset(
+    {
+        "turns",
+        "noise_pct",
+        "model_drift_pct",
+        "retrieval_waste_pct",
+        "reason_code_histogram",
+        "recommendations",
+        "risk_band_trail",
+        "drift_trend",
+        "top_dead_files",
+        "session_id",
+        "heatmap",
+        "heatmap_html",
+        "request_id",
+    }
+)
+
+
+def _normalize_rollup_body(body: Any) -> Mapping[str, Any]:
+    """Reconcile REST vs RunPod rollup wire shapes.
+
+    REST returns the metrics at the JSON root (e.g. ``{"turns": 3,
+    "noise_pct": 0.1, ...}``); the RunPod handler wraps them in
+    ``{"success": true, "action": "rollup", "rollup": {...},
+    "version": "..."}``. We always return the inner metrics dict
+    so callers see the same shape regardless of transport.
+    """
+
+    if not isinstance(body, Mapping):
+        return {}
+    if isinstance(body.get("rollup"), Mapping):
+        return dict(body["rollup"])
+    # If the body looks like the RunPod wrapper minus a ``rollup`` key
+    # (e.g. a future field rename) fall back to stripping the
+    # envelope-only keys so we never leak ``success`` / ``action`` into
+    # the typed ``RollupResponse`` extras.
+    envelope_keys = {"success", "action", "version", "id"}
+    if envelope_keys & set(body.keys()) and not (_ROLLUP_KNOWN_KEYS & set(body.keys())):
+        return {k: v for k, v in body.items() if k not in envelope_keys}
+    return dict(body)
+
+
+def _build_groundedness_payload(
+    *,
+    runpod: bool,
+    response_text: str,
+    query: str | None,
+    chunk_ids: Sequence[str] | None,
+    raw_context: RawContextInput | None,
+    support_units: PremiseSupportUnits | None,
+    attribution_mode: AttributionMode,
+    primary_metric: str | None,
+    coverage_threshold: float | None,
+    raw_context_chunk_tokens: int | None,
+    response_chunk_tokens: int | None,
+    language: str | None,
+    locale: str | None,
+    context_trust_enabled: bool,
+    runtime_head_features: Mapping[str, float] | None,
+    trajectory_features: Mapping[str, float] | None,
+    profile: str | None,
+    scoring_mode: str | None,
+    response_format: str | None,
+    include_triangular_diagnostics: bool | None,
+    evidence_limit: int | None,
+    heatmap_format: str | None,
+    auto_decide: bool | None,
+    extra: Mapping[str, Any] | None,
+) -> dict:
+    """Shared payload builder for sync + async ``score_groundedness``.
+
+    Centralising the validation + extra-merge logic keeps the two
+    clients byte-for-byte identical on the wire and means the
+    response-format default + language alias only have to be enforced
+    in one place.
+    """
+
+    if language is not None and locale is not None and language != locale:
+        raise LatenceTraceValidationError(
+            "score_groundedness: pass either `language` (preferred) or `locale`, not both",
+            status=422,
+        )
+    canonical_language = language if language is not None else locale
+
+    normalised_units: list[dict] | None = None
+    if support_units:
+        normalised_units = [
+            u.model_dump(exclude_none=True) if isinstance(u, SupportUnit) else dict(u)
+            for u in support_units
+        ]
+
+    # Default ``response_format=canonical`` for RunPod transports so
+    # the typed ``GroundednessResponse`` populates the nested ``scores``
+    # / ``runtime_decision`` blocks instead of receiving the compact
+    # flat dict (which would leave most typed fields at their None
+    # defaults). Callers can override by passing ``response_format``
+    # or stuffing it into ``extra``.
+    extra_dict = dict(extra) if extra else {}
+    effective_response_format = response_format
+    if effective_response_format is None and runpod and "response_format" not in extra_dict:
+        effective_response_format = "canonical"
+
+    try:
+        req = GroundednessRequest(
+            query_text=query,
+            response_text=response_text,
+            chunk_ids=list(chunk_ids) if chunk_ids else None,
+            raw_context=_coerce_raw_context(raw_context),
+            support_units=(
+                [SupportUnit(**u) for u in normalised_units]
+                if normalised_units
+                else None
+            ),
+            attribution_mode=attribution_mode,
+            primary_metric=primary_metric,
+            coverage_threshold=coverage_threshold,
+            raw_context_chunk_tokens=raw_context_chunk_tokens,
+            response_chunk_tokens=response_chunk_tokens,
+            language=canonical_language,
+            context_trust_enabled=context_trust_enabled,
+            runtime_head_features=runtime_head_features,
+            trajectory_features=trajectory_features,
+            profile=profile,
+            scoring_mode=scoring_mode,
+            response_format=effective_response_format,
+            include_triangular_diagnostics=include_triangular_diagnostics,
+            evidence_limit=evidence_limit,
+            heatmap_format=heatmap_format,
+            auto_decide=auto_decide,
+        )
+    except ValidationError as exc:
+        raise LatenceTraceValidationError(
+            f"client-side request validation failed: {exc.errors()[:3]}",
+            status=422,
+        ) from exc
+    body = req.model_dump(mode="json", exclude_none=True, by_alias=True)
+    if extra_dict:
+        body.update(extra_dict)
+    return body
 
 
 class PrivacyClient:
@@ -347,10 +490,18 @@ class Latence:
         coverage_threshold: float | None = None,
         raw_context_chunk_tokens: int | None = None,
         response_chunk_tokens: int | None = None,
+        language: str | None = None,
         locale: str | None = None,
         context_trust_enabled: bool = True,
         runtime_head_features: Mapping[str, float] | None = None,
         trajectory_features: Mapping[str, float] | None = None,
+        profile: str | None = None,
+        scoring_mode: str | None = None,
+        response_format: str | None = None,
+        include_triangular_diagnostics: bool | None = None,
+        evidence_limit: int | None = None,
+        heatmap_format: str | None = None,
+        auto_decide: bool | None = None,
         extra: Mapping[str, Any] | None = None,
     ) -> GroundednessResponse:
         """Score a response for groundedness against the supplied evidence.
@@ -360,6 +511,11 @@ class Latence:
         configured for open-domain attribution. The server returns a
         calibrated risk band (`green`/`amber`/`red`/`unknown`) along
         with the per-token signals used to draw a heatmap.
+
+        ``language`` is the preferred way to hint the per-class
+        calibration bundle (``en`` / ``de``); ``locale`` remains as a
+        deprecated alias for back-compat with 0.1.x callers and will
+        be removed in 0.2. The two cannot both be set.
         """
 
         payload = self._build_payload(
@@ -373,10 +529,18 @@ class Latence:
             coverage_threshold=coverage_threshold,
             raw_context_chunk_tokens=raw_context_chunk_tokens,
             response_chunk_tokens=response_chunk_tokens,
+            language=language,
             locale=locale,
             context_trust_enabled=context_trust_enabled,
             runtime_head_features=runtime_head_features,
             trajectory_features=trajectory_features,
+            profile=profile,
+            scoring_mode=scoring_mode,
+            response_format=response_format,
+            include_triangular_diagnostics=include_triangular_diagnostics,
+            evidence_limit=evidence_limit,
+            heatmap_format=heatmap_format,
+            auto_decide=auto_decide,
             extra=extra,
         )
         return self._request(
@@ -439,13 +603,37 @@ class Latence:
             expected_model=ComplianceRedactionResponse,
         )
 
-    def rollup(self, turns: Sequence[Mapping[str, Any]], **options: Any) -> Mapping[str, Any]:
-        return self._request(
+    def rollup(
+        self,
+        turns: Sequence[Mapping[str, Any]],
+        *,
+        as_model: bool = False,
+        **options: Any,
+    ) -> RollupResponse | Mapping[str, Any]:
+        """Aggregate session-level rollup metrics.
+
+        Returns a :class:`RollupResponse` when ``as_model=True`` (or
+        the deployment is RunPod and a typed model can be parsed
+        cleanly); otherwise returns the raw mapping as before for
+        back-compat with 0.1.x callers.
+
+        REST and RunPod transports historically disagreed on the wire
+        shape — REST returned the metrics at JSON root while RunPod
+        nested them under ``"rollup"``. We normalize the RunPod shape
+        before returning so callers see the same dict regardless of
+        transport.
+        """
+
+        body = self._request(
             "POST",
             "/groundedness/rollup",
             json={"turns": list(turns), **options},
             expected_model=None,
         )
+        normalized = _normalize_rollup_body(body)
+        if as_model:
+            return RollupResponse.model_validate({**normalized, "raw": body})
+        return normalized
 
     def session(
         self,
@@ -480,48 +668,46 @@ class Latence:
         coverage_threshold: float | None,
         raw_context_chunk_tokens: int | None,
         response_chunk_tokens: int | None,
+        language: str | None,
         locale: str | None,
         context_trust_enabled: bool,
         runtime_head_features: Mapping[str, float] | None,
         trajectory_features: Mapping[str, float] | None,
+        profile: str | None,
+        scoring_mode: str | None,
+        response_format: str | None,
+        include_triangular_diagnostics: bool | None,
+        evidence_limit: int | None,
+        heatmap_format: str | None,
+        auto_decide: bool | None,
         extra: Mapping[str, Any] | None,
     ) -> dict:
-        normalised_units: list[dict] | None = None
-        if support_units:
-            normalised_units = [
-                u.model_dump(exclude_none=True) if isinstance(u, SupportUnit) else dict(u)
-                for u in support_units
-            ]
-        try:
-            req = GroundednessRequest(
-                query_text=query,
-                response_text=response_text,
-                chunk_ids=list(chunk_ids) if chunk_ids else None,
-                raw_context=_coerce_raw_context(raw_context),
-                support_units=(
-                    [SupportUnit(**u) for u in normalised_units]
-                    if normalised_units
-                    else None
-                ),
-                attribution_mode=attribution_mode,
-                primary_metric=primary_metric,
-                coverage_threshold=coverage_threshold,
-                raw_context_chunk_tokens=raw_context_chunk_tokens,
-                response_chunk_tokens=response_chunk_tokens,
-                locale=locale,
-                context_trust_enabled=context_trust_enabled,
-                runtime_head_features=runtime_head_features,
-                trajectory_features=trajectory_features,
-            )
-        except ValidationError as exc:
-            raise LatenceTraceValidationError(
-                f"client-side request validation failed: {exc.errors()[:3]}",
-                status=422,
-            ) from exc
-        body = req.model_dump(mode="json", exclude_none=True)
-        if extra:
-            body.update(dict(extra))
-        return body
+        return _build_groundedness_payload(
+            runpod=self._runpod,
+            response_text=response_text,
+            query=query,
+            chunk_ids=chunk_ids,
+            raw_context=raw_context,
+            support_units=support_units,
+            attribution_mode=attribution_mode,
+            primary_metric=primary_metric,
+            coverage_threshold=coverage_threshold,
+            raw_context_chunk_tokens=raw_context_chunk_tokens,
+            response_chunk_tokens=response_chunk_tokens,
+            language=language,
+            locale=locale,
+            context_trust_enabled=context_trust_enabled,
+            runtime_head_features=runtime_head_features,
+            trajectory_features=trajectory_features,
+            profile=profile,
+            scoring_mode=scoring_mode,
+            response_format=response_format,
+            include_triangular_diagnostics=include_triangular_diagnostics,
+            evidence_limit=evidence_limit,
+            heatmap_format=heatmap_format,
+            auto_decide=auto_decide,
+            extra=extra,
+        )
 
     def _request(
         self,

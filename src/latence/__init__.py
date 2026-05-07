@@ -32,12 +32,19 @@ from latence.models import (
     ComplianceRedactionResponse,
     ComplianceUsage,
     CompressionResponse,
+    CorpusRoute,
     GroundednessRequest,
     GroundednessResponse,
+    GroundednessScores,
     MemoryUpdateResponse,
     NLIVerdict,
     RiskBand,
+    RollupDriftTrend,
+    RollupResponse,
+    RollupTopDeadFile,
     RuntimeDecision,
+    RuntimeEvidenceUnit,
+    RuntimeUnsupportedSpan,
     SupportUnit,
     TokenScore,
 )
@@ -49,7 +56,7 @@ from latence.sessions import (
     TraceSessionSnapshot,
 )
 
-__version__ = "0.1.4"
+__version__ = "0.1.5"
 
 __all__ = [
     "AsyncLatence",
@@ -64,9 +71,11 @@ __all__ = [
     "ComplianceRedactionResponse",
     "ComplianceUsage",
     "CompressionResponse",
+    "CorpusRoute",
     "FileSessionStorage",
     "GroundednessRequest",
     "GroundednessResponse",
+    "GroundednessScores",
     "InMemorySessionStorage",
     "Latence",
     "LatenceTraceAPIError",
@@ -79,7 +88,12 @@ __all__ = [
     "MemoryUpdateResponse",
     "NLIVerdict",
     "RiskBand",
+    "RollupDriftTrend",
+    "RollupResponse",
+    "RollupTopDeadFile",
     "RuntimeDecision",
+    "RuntimeEvidenceUnit",
+    "RuntimeUnsupportedSpan",
     "SessionStorage",
     "SupportUnit",
     "TokenScore",

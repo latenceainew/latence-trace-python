@@ -102,6 +102,41 @@ def test_langgraph_node_can_route_to_code_product_namespace() -> None:
     assert trace.grounding.calls[0][1]["extra"] == {"profile": "coding"}
 
 
+def test_band_utils_prefers_calibration_risk_band_over_runtime_decision() -> None:
+    from latence.integrations._band_utils import resolve_band, resolve_score
+
+    response = GroundednessResponse(
+        risk_band="red",
+        scores=GroundednessScores(groundedness_v2=0.82, risk_band="red"),
+        runtime_decision=RuntimeDecision(
+            action="block",
+            score=0.4,
+            score_channel="head:claim_decomposer",
+            class_key="rag.prose.multi_claim",
+            band="red",
+        ),
+    )
+
+    assert resolve_band(response) == "red"
+    assert resolve_score(response) == 0.82
+
+
+def test_band_utils_falls_back_to_runtime_decision_band_when_calibration_missing() -> None:
+    from latence.integrations._band_utils import resolve_band
+
+    class _Response:
+        risk_band = None
+        scores = None
+        band = None
+
+        class _RD:
+            band = "amber"
+
+        runtime_decision = _RD()
+
+    assert resolve_band(_Response()) == "amber"
+
+
 def test_phase5_n8n_workflows_target_product_paths() -> None:
     workflows_dir = Path(__file__).resolve().parents[1] / "examples/phase5/n8n"
     for workflow_path in workflows_dir.glob("*.json"):

@@ -79,6 +79,73 @@ class NLIVerdict(BaseModel):
     premise_index: int | None = None
 
 
+class GroundednessNLIAtom(BaseModel):
+    """Per-atom entailment record produced by atomic-fact decomposition.
+
+    Mirrors ``latence_trace.api.models.GroundednessNLIAtom``.
+    """
+
+    model_config = ConfigDict(extra="allow")
+    atom_index: int = 0
+    text: str = ""
+    char_start: int = 0
+    char_end: int = 0
+    entailment: float = 0.0
+    neutral: float = 0.0
+    contradiction: float = 0.0
+    score: float = 0.0
+    band: str | None = None
+    skipped: bool = False
+    skip_reason: str | None = None
+    premise_count: int = 0
+    support_ids: list[str] = Field(default_factory=list)
+    support_unit_indices: list[int] = Field(default_factory=list)
+
+
+class GroundednessNLIClaim(BaseModel):
+    """Per-claim entailment record returned by the NLI verifier.
+
+    Mirrors ``latence_trace.api.models.GroundednessNLIClaim``.
+    ``band`` is the server-stamped verdict (green/amber/red/skipped)
+    incorporating a contradiction-floor gate.
+    """
+
+    model_config = ConfigDict(extra="allow")
+    index: int = 0
+    text: str = ""
+    char_start: int = 0
+    char_end: int = 0
+    entailment: float = 0.0
+    neutral: float = 0.0
+    contradiction: float = 0.0
+    score: float = 0.0
+    band: str | None = None
+    skipped: bool = False
+    skip_reason: str | None = None
+    premise_count: int = 0
+    support_ids: list[str] = Field(default_factory=list)
+    support_unit_indices: list[int] = Field(default_factory=list)
+    atoms: list[GroundednessNLIAtom] = Field(default_factory=list)
+
+
+class GroundednessNLIDiagnostics(BaseModel):
+    """Per-request NLI verification diagnostics.
+
+    Mirrors ``latence_trace.api.models.GroundednessNLIDiagnostics``.
+    """
+
+    model_config = ConfigDict(extra="allow")
+    aggregate_score: float | None = Field(
+        default=None,
+        validation_alias=AliasChoices("aggregate_score", "aggregate"),
+    )
+    claims: list[GroundednessNLIClaim] = Field(default_factory=list)
+    claims_total: int | None = None
+    claims_scored: int | None = None
+    claims_skipped_for_budget: int | None = None
+    claims_skipped_for_no_premises: int | None = None
+
+
 class GroundednessScores(BaseModel):
     """Aggregate scores returned by ``/groundedness``.
 
@@ -309,7 +376,7 @@ class GroundednessResponse(BaseModel):
     heatmap: Mapping[str, Any] | None = None
     heatmap_html: str | None = None
     file_attribution: Mapping[str, Any] | None = None
-    nli_diagnostics: Mapping[str, Any] | None = None
+    nli_diagnostics: GroundednessNLIDiagnostics | None = None
     semantic_entropy_diagnostics: Mapping[str, Any] | None = None
     literal_diagnostics: Mapping[str, Any] | None = None
     structured_diagnostics: Mapping[str, Any] | None = None
@@ -491,21 +558,28 @@ class MemoryUpdateResponse(BaseModel):
 
 
 class RollupTopDeadFile(BaseModel):
-    """Per-file dead-weight metric inside :class:`RollupResponse`."""
+    """Per-file dead-weight metric inside :class:`RollupResponse`.
+
+    Mirrors ``latence_trace.api.models.RollupTopDeadFile``.
+    """
 
     model_config = ConfigDict(extra="allow")
-    path: str | None = None
-    coverage: float | None = None
-    owner_share: float | None = None
-    reason_codes: Sequence[str] = Field(default_factory=list)
+    path: str = ""
+    dead_turns: int = 0
+    ema_owner_share: float = 0.0
 
 
 class RollupDriftTrend(BaseModel):
-    """Drift trend slope/segment block inside :class:`RollupResponse`."""
+    """Drift-z-score trajectory summary inside :class:`RollupResponse`.
+
+    Mirrors ``latence_trace.api.models.DriftTrend``.
+    """
 
     model_config = ConfigDict(extra="allow")
-    slope: float | None = None
-    segments: Sequence[Mapping[str, Any]] = Field(default_factory=list)
+    min: float = 0.0
+    max: float = 0.0
+    mean: float = 0.0
+    last: float = 0.0
 
 
 class RollupResponse(BaseModel):

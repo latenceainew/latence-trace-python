@@ -33,6 +33,9 @@ from latence.models import (
     ComplianceUsage,
     CompressionResponse,
     CorpusRoute,
+    GroundednessNLIAtom,
+    GroundednessNLIClaim,
+    GroundednessNLIDiagnostics,
     GroundednessRequest,
     GroundednessResponse,
     GroundednessScores,
@@ -56,7 +59,7 @@ from latence.sessions import (
     TraceSessionSnapshot,
 )
 
-__version__ = "0.1.5"
+__version__ = "0.1.6"
 
 __all__ = [
     "AsyncLatence",
@@ -73,6 +76,9 @@ __all__ = [
     "CompressionResponse",
     "CorpusRoute",
     "FileSessionStorage",
+    "GroundednessNLIAtom",
+    "GroundednessNLIClaim",
+    "GroundednessNLIDiagnostics",
     "GroundednessRequest",
     "GroundednessResponse",
     "GroundednessScores",

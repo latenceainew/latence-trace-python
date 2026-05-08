@@ -94,19 +94,8 @@ class AsyncGroundingClient:
             **kwargs,
         )
 
-    async def code(
-        self,
-        *,
-        context_trust_enabled: bool = True,
-        **kwargs: Any,
-    ) -> GroundednessResponse:
-        extra = dict(kwargs.pop("extra", {}) or {})
-        extra.setdefault("scoring_mode", "code")
-        return await self._owner.score_groundedness(
-            extra=extra,
-            context_trust_enabled=context_trust_enabled,
-            **kwargs,
-        )
+    async def code(self, **kwargs: Any) -> GroundednessResponse:
+        raise NotImplementedError("Code scoring has been removed. Use .rag() instead.")
 
 
 class AsyncCompressionClient:
@@ -138,53 +127,15 @@ class AsyncMemoryClient:
     def __init__(self, owner: AsyncLatence) -> None:
         self._owner = owner
 
-    async def step(
-        self,
-        *,
-        prior_memory_state: Mapping[str, Any] | None = None,
-        idempotency_key: str | None = None,
-        **payload: Any,
-    ) -> MemoryUpdateResponse:
-        body = dict(payload)
-        body["prior_memory_state"] = prior_memory_state
-        headers = {"Idempotency-Key": idempotency_key} if idempotency_key else None
-        return await self._owner._request(
-            "POST",
-            "/v1/memory/update",
-            json=body,
-            headers=headers,
-            expected_model=MemoryUpdateResponse,
-        )
+    async def step(self, **kwargs: Any) -> MemoryUpdateResponse:
+        raise NotImplementedError("Memory API has been removed.")
 
 
 class AsyncTraceSession:
     """Async SDK-managed state facade for stateless TRACE deployments."""
 
-    def __init__(
-        self,
-        owner: AsyncLatence,
-        *,
-        session_id: str | None = None,
-        memory_state: Mapping[str, Any] | None = None,
-        metadata: Mapping[str, Any] | None = None,
-        storage: SessionStorage | None = None,
-        context_trust_enabled: bool = True,
-    ) -> None:
-        self._owner = owner
-        self.session_id = session_id
-        self.memory_state = dict(memory_state) if memory_state else None
-        self.metadata = dict(metadata or {})
-        self.events: list[dict[str, Any]] = []
-        self.idempotency_keys: list[str] = []
-        self.context_trust_enabled = context_trust_enabled
-        self._storage = storage
-        if storage and session_id:
-            snapshot = storage.load(session_id)
-            if snapshot:
-                self.memory_state = snapshot.memory_state
-                self.metadata.update(snapshot.metadata)
-                self.events = list(snapshot.events)
-                self.idempotency_keys = list(snapshot.idempotency_keys)
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        raise NotImplementedError("Sessions have been removed. Use stateless grounding.rag() calls.")
 
     def event(self, event_type: str, content: str, **metadata: Any) -> Mapping[str, Any]:
         key = str(metadata.pop("idempotency_key", "") or new_idempotency_key("event"))
@@ -460,23 +411,8 @@ class AsyncLatence:
             return RollupResponse.model_validate({**normalized, "raw": body})
         return normalized
 
-    def session(
-        self,
-        *,
-        session_id: str | None = None,
-        memory_state: Mapping[str, Any] | None = None,
-        metadata: Mapping[str, Any] | None = None,
-        storage: SessionStorage | None = None,
-        context_trust_enabled: bool = True,
-    ) -> AsyncTraceSession:
-        return AsyncTraceSession(
-            self,
-            session_id=session_id,
-            memory_state=memory_state,
-            metadata=metadata,
-            storage=storage,
-            context_trust_enabled=context_trust_enabled,
-        )
+    def session(self, **kwargs: Any) -> AsyncTraceSession:
+        raise NotImplementedError("Sessions have been removed. Use stateless grounding.rag() calls.")
 
     # --- internal --------------------------------------------------------
 

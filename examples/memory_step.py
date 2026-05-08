@@ -1,3 +1,4 @@
+# DEPRECATED: Memory API has been removed from the product.
 """Call the stateless InfiniMem update endpoint directly."""
 
 from latence import Latence

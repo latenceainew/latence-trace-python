@@ -226,44 +226,19 @@ class GroundingClient:
     def rag(
         self,
         *,
-        context_trust_enabled: bool = True,
-        memory_state: Mapping[str, Any] | None = None,
-        memory_policy: Mapping[str, Any] | None = None,
+        context_trust_enabled: bool = False,
         **kwargs: Any,
     ) -> GroundednessResponse:
         extra = dict(kwargs.pop("extra", {}) or {})
         extra.setdefault("scoring_mode", "rag")
-        if memory_state is not None:
-            extra.setdefault("memory_state", dict(memory_state))
-            extra.setdefault("apply_memory_context", True)
-        if memory_policy is not None:
-            extra.setdefault("memory_policy", dict(memory_policy))
         return self._owner.score_groundedness(
             extra=extra,
             context_trust_enabled=context_trust_enabled,
             **kwargs,
         )
 
-    def code(
-        self,
-        *,
-        context_trust_enabled: bool = True,
-        memory_state: Mapping[str, Any] | None = None,
-        memory_policy: Mapping[str, Any] | None = None,
-        **kwargs: Any,
-    ) -> GroundednessResponse:
-        extra = dict(kwargs.pop("extra", {}) or {})
-        extra.setdefault("scoring_mode", "code")
-        if memory_state is not None:
-            extra.setdefault("memory_state", dict(memory_state))
-            extra.setdefault("apply_memory_context", True)
-        if memory_policy is not None:
-            extra.setdefault("memory_policy", dict(memory_policy))
-        return self._owner.score_groundedness(
-            extra=extra,
-            context_trust_enabled=context_trust_enabled,
-            **kwargs,
-        )
+    def code(self, **kwargs: Any) -> GroundednessResponse:
+        raise NotImplementedError("Code scoring has been removed. Use .rag() instead.")
 
 
 class CompressionClient:
@@ -295,53 +270,15 @@ class MemoryClient:
     def __init__(self, owner: Latence) -> None:
         self._owner = owner
 
-    def step(
-        self,
-        *,
-        prior_memory_state: Mapping[str, Any] | None = None,
-        idempotency_key: str | None = None,
-        **payload: Any,
-    ) -> MemoryUpdateResponse:
-        body = dict(payload)
-        body["prior_memory_state"] = prior_memory_state
-        headers = {"Idempotency-Key": idempotency_key} if idempotency_key else None
-        return self._owner._request(
-            "POST",
-            "/v1/memory/update",
-            json=body,
-            headers=headers,
-            expected_model=MemoryUpdateResponse,
-        )
+    def step(self, **kwargs: Any) -> MemoryUpdateResponse:
+        raise NotImplementedError("Memory API has been removed.")
 
 
 class TraceSession:
     """SDK-managed state facade for stateless TRACE deployments."""
 
-    def __init__(
-        self,
-        owner: Latence,
-        *,
-        session_id: str | None = None,
-        memory_state: Mapping[str, Any] | None = None,
-        metadata: Mapping[str, Any] | None = None,
-        storage: SessionStorage | None = None,
-        context_trust_enabled: bool = True,
-    ) -> None:
-        self._owner = owner
-        self.session_id = session_id
-        self.memory_state = dict(memory_state) if memory_state else None
-        self.metadata = dict(metadata or {})
-        self.events: list[dict[str, Any]] = []
-        self.idempotency_keys: list[str] = []
-        self.context_trust_enabled = context_trust_enabled
-        self._storage = storage
-        if storage and session_id:
-            snapshot = storage.load(session_id)
-            if snapshot:
-                self.memory_state = snapshot.memory_state
-                self.metadata.update(snapshot.metadata)
-                self.events = list(snapshot.events)
-                self.idempotency_keys = list(snapshot.idempotency_keys)
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        raise NotImplementedError("Sessions have been removed. Use stateless grounding.rag() calls.")
 
     def event(self, event_type: str, content: str, **metadata: Any) -> Mapping[str, Any]:
         key = str(metadata.pop("idempotency_key", "") or new_idempotency_key("event"))
@@ -357,25 +294,10 @@ class TraceSession:
         return event
 
     def memory_step(self, **payload: Any) -> MemoryUpdateResponse:
-        key = str(payload.pop("idempotency_key", "") or new_idempotency_key("memory"))
-        result = self._owner.memory.step(
-            prior_memory_state=self.memory_state,
-            idempotency_key=key,
-            **payload,
-        )
-        next_state = result.next_memory_state
-        if isinstance(next_state, Mapping):
-            self.memory_state = dict(next_state)
-        self.idempotency_keys.append(key)
-        self.save()
-        return result
+        raise NotImplementedError("Memory API has been removed.")
 
     def _chain_memory(self, response: GroundednessResponse) -> None:
-        """Update session memory_state from the groundedness response."""
-        next_state = getattr(response, "next_memory_state", None)
-        if isinstance(next_state, Mapping):
-            self.memory_state = dict(next_state)
-            self.save()
+        raise NotImplementedError("Memory API has been removed.")
 
     def rag(
         self,
@@ -402,30 +324,8 @@ class TraceSession:
         self._chain_memory(result)
         return result
 
-    def code(
-        self,
-        *,
-        context_trust_enabled: bool | None = None,
-        **kwargs: Any,
-    ) -> GroundednessResponse:
-        extra = dict(kwargs.pop("extra", {}) or {})
-        if self.session_id:
-            extra.setdefault("session_id", self.session_id)
-        if self.memory_state:
-            extra.setdefault("memory_state", self.memory_state)
-            extra.setdefault("apply_memory_context", True)
-        extra.setdefault("metadata", dict(self.metadata))
-        result = self._owner.grounding.code(
-            extra=extra,
-            context_trust_enabled=(
-                self.context_trust_enabled
-                if context_trust_enabled is None
-                else context_trust_enabled
-            ),
-            **kwargs,
-        )
-        self._chain_memory(result)
-        return result
+    def code(self, **kwargs: Any) -> GroundednessResponse:
+        raise NotImplementedError("Code scoring has been removed. Use .rag() instead.")
 
     def rollup(self, **options: Any) -> Mapping[str, Any]:
         return self._owner.rollup(normalize_events(self.events), **options)
@@ -662,23 +562,8 @@ class Latence:
             return RollupResponse.model_validate({**normalized, "raw": body})
         return normalized
 
-    def session(
-        self,
-        *,
-        session_id: str | None = None,
-        memory_state: Mapping[str, Any] | None = None,
-        metadata: Mapping[str, Any] | None = None,
-        storage: SessionStorage | None = None,
-        context_trust_enabled: bool = True,
-    ) -> TraceSession:
-        return TraceSession(
-            self,
-            session_id=session_id,
-            memory_state=memory_state,
-            metadata=metadata,
-            storage=storage,
-            context_trust_enabled=context_trust_enabled,
-        )
+    def session(self, **kwargs: Any) -> TraceSession:
+        raise NotImplementedError("Sessions have been removed. Use stateless grounding.rag() calls.")
 
     # --- internal --------------------------------------------------------
 

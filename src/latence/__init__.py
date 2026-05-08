@@ -12,8 +12,10 @@ typed Pydantic models, so calling code stays identical regardless of
 the runtime.
 """
 
-from latence.async_client import AsyncLatence, AsyncLatenceTraceClient, AsyncTraceSession
-from latence.client import Latence, LatenceTraceClient, TraceSession
+from latence.async_client import AsyncLatence, AsyncLatenceTraceClient  # noqa: F401
+# from latence.async_client import AsyncTraceSession  # removed: sessions API removed
+from latence.client import Latence, LatenceTraceClient  # noqa: F401
+# from latence.client import TraceSession  # removed: sessions API removed
 from latence.errors import (
     LatenceTraceAPIError,
     LatenceTraceAuthError,
@@ -39,7 +41,7 @@ from latence.models import (
     GroundednessRequest,
     GroundednessResponse,
     GroundednessScores,
-    MemoryUpdateResponse,
+    # MemoryUpdateResponse,  # removed: memory API removed
     NLIVerdict,
     RiskBand,
     RollupDriftTrend,
@@ -52,11 +54,11 @@ from latence.models import (
     TokenScore,
 )
 from latence.sessions import (
-    FileSessionStorage,
-    InMemorySessionStorage,
-    SessionStorage,
+    # FileSessionStorage,  # removed: sessions API removed
+    # InMemorySessionStorage,  # removed: sessions API removed
+    # SessionStorage,  # removed: sessions API removed
     TraceEvent,
-    TraceSessionSnapshot,
+    # TraceSessionSnapshot,  # removed: sessions API removed
 )
 
 __version__ = "0.1.6"
@@ -64,7 +66,7 @@ __version__ = "0.1.6"
 __all__ = [
     "AsyncLatence",
     "AsyncLatenceTraceClient",
-    "AsyncTraceSession",
+    # "AsyncTraceSession",  # removed: sessions API removed
     "AttributionMode",
     "ComplianceCustomLabel",
     "ComplianceEntity",
@@ -75,14 +77,14 @@ __all__ = [
     "ComplianceUsage",
     "CompressionResponse",
     "CorpusRoute",
-    "FileSessionStorage",
+    # "FileSessionStorage",  # removed: sessions API removed
     "GroundednessNLIAtom",
     "GroundednessNLIClaim",
     "GroundednessNLIDiagnostics",
     "GroundednessRequest",
     "GroundednessResponse",
     "GroundednessScores",
-    "InMemorySessionStorage",
+    # "InMemorySessionStorage",  # removed: sessions API removed
     "Latence",
     "LatenceTraceAPIError",
     "LatenceTraceAuthError",
@@ -91,7 +93,7 @@ __all__ = [
     "LatenceTraceServerError",
     "LatenceTraceTimeout",
     "LatenceTraceValidationError",
-    "MemoryUpdateResponse",
+    # "MemoryUpdateResponse",  # removed: memory API removed
     "NLIVerdict",
     "RiskBand",
     "RollupDriftTrend",
@@ -100,11 +102,11 @@ __all__ = [
     "RuntimeDecision",
     "RuntimeEvidenceUnit",
     "RuntimeUnsupportedSpan",
-    "SessionStorage",
+    # "SessionStorage",  # removed: sessions API removed
     "SupportUnit",
     "TokenScore",
     "TraceEvent",
-    "TraceSession",
-    "TraceSessionSnapshot",
+    # "TraceSession",  # removed: sessions API removed
+    # "TraceSessionSnapshot",  # removed: sessions API removed
     "__version__",
 ]

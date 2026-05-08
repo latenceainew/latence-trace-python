@@ -93,19 +93,8 @@ def score_code(
     context_trust_enabled: bool = True,
     extra: Mapping[str, Any] | None = None,
 ) -> GroundednessResponse:
-    """Score coding-agent output through the SDK product namespace."""
-
-    return _score(
-        trace,
-        mode="code",
-        query=query,
-        response_text=response_text,
-        raw_context=raw_context,
-        profile=profile,
-        attribution_mode=attribution_mode,
-        context_trust_enabled=context_trust_enabled,
-        extra=extra,
-    )
+    """Removed in retrieval-only pivot."""
+    raise NotImplementedError("Code scoring is not available.")
 
 
 def score(
@@ -123,16 +112,7 @@ def score(
     """Dispatch to the correct product path for a framework adapter."""
 
     if mode == "code":
-        return score_code(
-            trace,
-            query=query,
-            response_text=response_text,
-            raw_context=raw_context,
-            profile=profile,
-            attribution_mode=attribution_mode,
-            context_trust_enabled=context_trust_enabled,
-            extra=extra,
-        )
+        raise NotImplementedError("Code scoring removed.")
     return score_rag(
         trace,
         query=query,

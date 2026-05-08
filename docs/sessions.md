@@ -1,5 +1,9 @@
 # Sessions
 
+> **Deprecated.** Sessions have been deprecated. Use stateless `grounding.rag()` calls.
+
+---
+
 TRACE compute deployments are stateless. Session state belongs to the caller so
 the same deployment can serve RunPod, VPC, on-prem, and local agent workflows
 without shared server storage.

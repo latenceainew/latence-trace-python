@@ -11,10 +11,11 @@ requires-python = ">=3.10"
 license = "MIT"
 authors = [{ name = "latence.ai", email = "support@latence.ai" }]
 keywords = [
-  "agents",
   "groundedness",
   "hallucination-detection",
+  "knowledge",
   "rag",
+  "retrieval",
   "trace",
 ]
 classifiers = [

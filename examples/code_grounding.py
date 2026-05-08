@@ -1,3 +1,4 @@
+# DEPRECATED: Code grounding has been removed from the product. Use rag grounding instead.
 """Score an agentic coding answer against code context."""
 
 from latence import Latence

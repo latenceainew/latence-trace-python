@@ -217,10 +217,10 @@ class GroundednessScores(BaseModel):
     dead_weight_ratio: float | None = None
     dead_weight_file_count: int | None = None
     # Trust lane
-    context_trust_score: float | None = None
-    context_trust_suspicious_count: int | None = None
-    context_trust_blocked_count: int | None = None
-    context_trust_max_risk: float | None = None
+    context_trust_score: float | None = Field(default=None, exclude=True)
+    context_trust_suspicious_count: int | None = Field(default=None, exclude=True)
+    context_trust_blocked_count: int | None = Field(default=None, exclude=True)
+    context_trust_max_risk: float | None = Field(default=None, exclude=True)
     # Headline band
     risk_band: str | None = None
 
@@ -367,7 +367,7 @@ class GroundednessResponse(BaseModel):
     response_tokens: Sequence[TokenScore] = Field(default_factory=list)
     nli: Sequence[NLIVerdict] = Field(default_factory=list)
     support_units: Sequence[Mapping[str, Any]] = Field(default_factory=list)
-    context_trust_diagnostics: Mapping[str, Any] | None = None
+    context_trust_diagnostics: Mapping[str, Any] | None = Field(default=None, exclude=True)
     runtime_decision: RuntimeDecision | None = None
     runtime_head_features: Mapping[str, float] | None = None
     runtime_feature_source: str | None = None
@@ -380,13 +380,13 @@ class GroundednessResponse(BaseModel):
     semantic_entropy_diagnostics: Mapping[str, Any] | None = None
     literal_diagnostics: Mapping[str, Any] | None = None
     structured_diagnostics: Mapping[str, Any] | None = None
-    code_lane_diagnostics: Mapping[str, Any] | None = None
+    code_lane_diagnostics: Mapping[str, Any] | None = Field(default=None, exclude=True)
     profile_diagnostics: Mapping[str, Any] | None = None
-    memory_diagnostics: Mapping[str, Any] | None = None
-    next_session_state: Mapping[str, Any] | None = None
-    next_memory_state: Mapping[str, Any] | None = None
-    hot_context_preview: str | None = None
-    session_signals: Mapping[str, Any] | None = None
+    next_memory_state: Mapping[str, Any] | None = Field(default=None, exclude=True)
+    hot_context_preview: str | None = Field(default=None, exclude=True)
+    memory_diagnostics: Mapping[str, Any] | None = Field(default=None, exclude=True)
+    next_session_state: Mapping[str, Any] | None = Field(default=None, exclude=True)
+    session_signals: Mapping[str, Any] | None = Field(default=None, exclude=True)
     amber_escalation: Mapping[str, Any] | None = None
     warnings: Sequence[str] = Field(default_factory=list)
     reason: str | None = None
@@ -538,14 +538,7 @@ class CompressionResponse(BaseModel):
 
 
 class MemoryUpdateResponse(BaseModel):
-    """Response for ``/v1/memory/update``.
-
-    The server contract guarantees ``next_memory_state`` and
-    ``hot_context``; both are required here so SDK callers can
-    treat them as non-None without extra defensive checks. The
-    legacy ``hot_context_preview`` mirror remains available for
-    compact transports that emit a truncated preview separately.
-    """
+    """Deprecated - memory API removed"""
 
     model_config = ConfigDict(extra="allow")
     next_memory_state: Mapping[str, Any]

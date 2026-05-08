@@ -30,17 +30,6 @@ print(score.risk_band)
 print(score.runtime_decision)
 ```
 
-Use the `context_trust_enabled` flag when you need to disable the prompt-guard
-lane for a specific request. It is enabled by default.
-
-```python
-score = trace.grounding.rag(
-    query="Can this invoice be refunded?",
-    response_text="Yes, it will be refunded within 48 hours.",
-    raw_context="Refunds require manual finance approval.",
-    context_trust_enabled=False,
-)
-```
 
 ## 2. Redact Private Data
 

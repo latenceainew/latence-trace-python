@@ -83,7 +83,7 @@ class AsyncGroundingClient:
     async def rag(
         self,
         *,
-        context_trust_enabled: bool = True,
+        context_trust_enabled: bool = False,
         **kwargs: Any,
     ) -> GroundednessResponse:
         extra = dict(kwargs.pop("extra", {}) or {})
@@ -151,18 +151,7 @@ class AsyncTraceSession:
         return event
 
     async def memory_step(self, **payload: Any) -> MemoryUpdateResponse:
-        key = str(payload.pop("idempotency_key", "") or new_idempotency_key("memory"))
-        result = await self._owner.memory.step(
-            prior_memory_state=self.memory_state,
-            idempotency_key=key,
-            **payload,
-        )
-        next_state = result.next_memory_state
-        if isinstance(next_state, Mapping):
-            self.memory_state = dict(next_state)
-        self.idempotency_keys.append(key)
-        self.save()
-        return result
+        raise NotImplementedError("Memory API has been removed.")
 
     async def rag(
         self,
@@ -186,27 +175,8 @@ class AsyncTraceSession:
             **kwargs,
         )
 
-    async def code(
-        self,
-        *,
-        context_trust_enabled: bool | None = None,
-        **kwargs: Any,
-    ) -> GroundednessResponse:
-        extra = dict(kwargs.pop("extra", {}) or {})
-        if self.session_id:
-            extra.setdefault("session_id", self.session_id)
-        if self.memory_state:
-            extra.setdefault("memory_state", self.memory_state)
-        extra.setdefault("metadata", dict(self.metadata))
-        return await self._owner.grounding.code(
-            extra=extra,
-            context_trust_enabled=(
-                self.context_trust_enabled
-                if context_trust_enabled is None
-                else context_trust_enabled
-            ),
-            **kwargs,
-        )
+    async def code(self, **kwargs: Any) -> GroundednessResponse:
+        raise NotImplementedError("Code scoring has been removed. Use .rag() instead.")
 
     async def rollup(self, **options: Any) -> Mapping[str, Any]:
         return await self._owner.rollup(normalize_events(self.events), **options)

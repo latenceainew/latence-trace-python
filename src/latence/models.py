@@ -266,7 +266,7 @@ class GroundednessRequest(BaseModel):
     evidence_limit: int | None = None
     heatmap_format: str | None = None
     auto_decide: bool | None = None
-    scoring_mode: Literal["rag", "code"] | None = None
+    scoring_mode: Literal["rag"] | None = None
 
 
 class RuntimeEvidenceUnit(BaseModel):

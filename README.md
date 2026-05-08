@@ -15,8 +15,6 @@
   ·
   <a href="docs/quickstart.md">Quickstart</a>
   ·
-  <a href="docs/sessions.md">Sessions</a>
-  ·
   <a href="docs/integrations.md">Integrations</a>
   ·
   <a href="examples/">Examples</a>
@@ -276,7 +274,6 @@ from latence import LatenceTraceClient, AsyncLatenceTraceClient
 ## More
 
 - [Quickstart](docs/quickstart.md)
-- [Sessions](docs/sessions.md)
 - [Integrations](docs/integrations.md)
 - [Phase 5 Integration Checkpoint](docs/phase5_integration_checkpoint.md)
 - [Errors](docs/errors.md)

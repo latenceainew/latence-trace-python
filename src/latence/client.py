@@ -227,10 +227,17 @@ class GroundingClient:
         self,
         *,
         context_trust_enabled: bool = True,
+        memory_state: Mapping[str, Any] | None = None,
+        memory_policy: Mapping[str, Any] | None = None,
         **kwargs: Any,
     ) -> GroundednessResponse:
         extra = dict(kwargs.pop("extra", {}) or {})
         extra.setdefault("scoring_mode", "rag")
+        if memory_state is not None:
+            extra.setdefault("memory_state", dict(memory_state))
+            extra.setdefault("apply_memory_context", True)
+        if memory_policy is not None:
+            extra.setdefault("memory_policy", dict(memory_policy))
         return self._owner.score_groundedness(
             extra=extra,
             context_trust_enabled=context_trust_enabled,
@@ -241,10 +248,17 @@ class GroundingClient:
         self,
         *,
         context_trust_enabled: bool = True,
+        memory_state: Mapping[str, Any] | None = None,
+        memory_policy: Mapping[str, Any] | None = None,
         **kwargs: Any,
     ) -> GroundednessResponse:
         extra = dict(kwargs.pop("extra", {}) or {})
         extra.setdefault("scoring_mode", "code")
+        if memory_state is not None:
+            extra.setdefault("memory_state", dict(memory_state))
+            extra.setdefault("apply_memory_context", True)
+        if memory_policy is not None:
+            extra.setdefault("memory_policy", dict(memory_policy))
         return self._owner.score_groundedness(
             extra=extra,
             context_trust_enabled=context_trust_enabled,
@@ -356,6 +370,13 @@ class TraceSession:
         self.save()
         return result
 
+    def _chain_memory(self, response: GroundednessResponse) -> None:
+        """Update session memory_state from the groundedness response."""
+        next_state = getattr(response, "next_memory_state", None)
+        if isinstance(next_state, Mapping):
+            self.memory_state = dict(next_state)
+            self.save()
+
     def rag(
         self,
         *,
@@ -368,7 +389,7 @@ class TraceSession:
         if self.memory_state:
             extra.setdefault("memory_state", self.memory_state)
         extra.setdefault("metadata", dict(self.metadata))
-        return self._owner.grounding.rag(
+        result = self._owner.grounding.rag(
             extra=extra,
             context_trust_enabled=(
                 self.context_trust_enabled
@@ -377,6 +398,8 @@ class TraceSession:
             ),
             **kwargs,
         )
+        self._chain_memory(result)
+        return result
 
     def code(
         self,
@@ -390,7 +413,7 @@ class TraceSession:
         if self.memory_state:
             extra.setdefault("memory_state", self.memory_state)
         extra.setdefault("metadata", dict(self.metadata))
-        return self._owner.grounding.code(
+        result = self._owner.grounding.code(
             extra=extra,
             context_trust_enabled=(
                 self.context_trust_enabled
@@ -399,6 +422,8 @@ class TraceSession:
             ),
             **kwargs,
         )
+        self._chain_memory(result)
+        return result
 
     def rollup(self, **options: Any) -> Mapping[str, Any]:
         return self._owner.rollup(normalize_events(self.events), **options)

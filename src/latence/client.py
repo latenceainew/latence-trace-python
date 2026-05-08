@@ -248,7 +248,7 @@ class CompressionClient:
     def text(self, text: str, **options: Any) -> CompressionResponse:
         return self._owner._request(
             "POST",
-            "/v1/compression",
+            "/v1/compress",
             json={"text": text, **options},
             expected_model=CompressionResponse,
         )
@@ -260,7 +260,7 @@ class CompressionClient:
     ) -> CompressionResponse:
         return self._owner._request(
             "POST",
-            "/v1/compression",
+            "/v1/compress",
             json={"action": "compress_messages", "messages": list(messages), **options},
             expected_model=CompressionResponse,
         )
@@ -472,7 +472,7 @@ class Latence:
         )
         return self._request(
             "POST",
-            "/groundedness",
+            "/v1/grounding",
             json=payload,
             expected_model=GroundednessResponse,
         )
@@ -525,7 +525,7 @@ class Latence:
             body.update(dict(extra))
         return self._request(
             "POST",
-            "/v1/compliance/redact",
+            "/v1/redact",
             json=body,
             expected_model=ComplianceRedactionResponse,
         )

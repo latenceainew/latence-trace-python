@@ -25,16 +25,18 @@ from latence.errors import (
     _Envelope,
 )
 
-DEFAULT_USER_AGENT = "latence/0.1.6"
+DEFAULT_USER_AGENT = "latence/0.2.0"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 DEFAULT_MAX_RETRIES = 4
 RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
 RUNPOD_PRODUCT_ACTIONS = {
+    "/v1/grounding": "score",
+    "/v1/redact": "redact",
+    "/v1/compress": "compress",
+    # Legacy paths — kept for RunPod-direct users during migration
     "/groundedness": "score",
     "/v1/compliance/redact": "redact",
     "/v1/compression": "compress",
-    "/v1/memory/update": "memory.update",
-    "/groundedness/rollup": "rollup",
 }
 
 
@@ -212,7 +214,7 @@ def _envelope_from_body(body: Any) -> _Envelope | None:
 
 
 def coerce_base_url(base_url: str | None) -> str:
-    base = base_url or os.environ.get("LATENCE_TRACE_URL", "http://localhost:8090")
+    base = base_url or os.environ.get("LATENCE_TRACE_URL", "https://api.latence.ai")
     return base.rstrip("/")
 
 

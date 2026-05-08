@@ -105,7 +105,7 @@ class AsyncCompressionClient:
     async def text(self, text: str, **options: Any) -> CompressionResponse:
         return await self._owner._request(
             "POST",
-            "/v1/compression",
+            "/v1/compress",
             json={"text": text, **options},
             expected_model=CompressionResponse,
         )
@@ -117,7 +117,7 @@ class AsyncCompressionClient:
     ) -> CompressionResponse:
         return await self._owner._request(
             "POST",
-            "/v1/compression",
+            "/v1/compress",
             json={"action": "compress_messages", "messages": list(messages), **options},
             expected_model=CompressionResponse,
         )
@@ -307,7 +307,7 @@ class AsyncLatence:
         )
         return await self._request(
             "POST",
-            "/groundedness",
+            "/v1/grounding",
             json=payload,
             expected_model=GroundednessResponse,
         )
@@ -358,7 +358,7 @@ class AsyncLatence:
             body.update(dict(extra))
         return await self._request(
             "POST",
-            "/v1/compliance/redact",
+            "/v1/redact",
             json=body,
             expected_model=ComplianceRedactionResponse,
         )

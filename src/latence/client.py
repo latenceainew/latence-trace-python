@@ -388,6 +388,7 @@ class TraceSession:
             extra.setdefault("session_id", self.session_id)
         if self.memory_state:
             extra.setdefault("memory_state", self.memory_state)
+            extra.setdefault("apply_memory_context", True)
         extra.setdefault("metadata", dict(self.metadata))
         result = self._owner.grounding.rag(
             extra=extra,
@@ -412,6 +413,7 @@ class TraceSession:
             extra.setdefault("session_id", self.session_id)
         if self.memory_state:
             extra.setdefault("memory_state", self.memory_state)
+            extra.setdefault("apply_memory_context", True)
         extra.setdefault("metadata", dict(self.metadata))
         result = self._owner.grounding.code(
             extra=extra,

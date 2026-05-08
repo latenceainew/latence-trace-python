@@ -10,7 +10,6 @@ Configure the endpoint:
 
 ```bash
 export LATENCE_TRACE_API_KEY="lat_..."
-export LATENCE_TRACE_URL="https://your-trace-endpoint.example.com"
 ```
 
 ## 1. Score A RAG Answer
@@ -53,28 +52,7 @@ compressed = trace.compression.text(
 print(compressed.compressed_text)
 ```
 
-## 4. Carry Agent State
-
-```python
-from latence import FileSessionStorage, Latence
-
-trace = Latence()
-session = trace.session(
-    session_id="agent-run-1",
-    storage=FileSessionStorage(".trace-sessions"),
-)
-
-session.event("tool", "loaded policy")
-session.memory_step(turn_text="Keep finance approval as required context.")
-score = session.rag(
-    query="Can I promise a refund?",
-    response_text="The refund is guaranteed.",
-    raw_context="Refunds require finance approval.",
-)
-session.save()
-```
-
-## 5. Async Services
+## 4. Async Services
 
 ```python
 from latence import AsyncLatence

@@ -127,8 +127,11 @@ class AsyncMemoryClient:
     def __init__(self, owner: AsyncLatence) -> None:
         self._owner = owner
 
-    async def step(self, **kwargs: Any) -> MemoryUpdateResponse:
-        raise NotImplementedError("Memory API has been removed.")
+    async def step(self, **kwargs: Any) -> Any:
+        raise NotImplementedError(
+            "memory.step() has been removed in 0.2.0. "
+            "Use stateless grounding.rag() calls instead."
+        )
 
 
 class AsyncTraceSession:
@@ -150,8 +153,11 @@ class AsyncTraceSession:
         self.save()
         return event
 
-    async def memory_step(self, **payload: Any) -> MemoryUpdateResponse:
-        raise NotImplementedError("Memory API has been removed.")
+    async def memory_step(self, **payload: Any) -> Any:
+        raise NotImplementedError(
+            "memory_step() has been removed in 0.2.0. "
+            "Use stateless grounding.rag() calls instead."
+        )
 
     async def rag(
         self,
@@ -178,8 +184,11 @@ class AsyncTraceSession:
     async def code(self, **kwargs: Any) -> GroundednessResponse:
         raise NotImplementedError("Code scoring has been removed. Use .rag() instead.")
 
-    async def rollup(self, **options: Any) -> Mapping[str, Any]:
-        return await self._owner.rollup(normalize_events(self.events), **options)
+    async def rollup(self, **options: Any) -> Any:
+        raise NotImplementedError(
+            "rollup() has been removed in 0.2.0. "
+            "Use stateless grounding.rag() calls instead."
+        )
 
     def snapshot(self) -> TraceSessionSnapshot:
         return TraceSessionSnapshot(
@@ -363,23 +372,11 @@ class AsyncLatence:
             expected_model=ComplianceRedactionResponse,
         )
 
-    async def rollup(
-        self,
-        turns: Sequence[Mapping[str, Any]],
-        *,
-        as_model: bool = False,
-        **options: Any,
-    ) -> RollupResponse | Mapping[str, Any]:
-        body = await self._request(
-            "POST",
-            "/groundedness/rollup",
-            json={"turns": list(turns), **options},
-            expected_model=None,
+    async def rollup(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError(
+            "rollup() has been removed in 0.2.0. "
+            "Use stateless grounding.rag() calls instead."
         )
-        normalized = _normalize_rollup_body(body)
-        if as_model:
-            return RollupResponse.model_validate({**normalized, "raw": body})
-        return normalized
 
     def session(self, **kwargs: Any) -> AsyncTraceSession:
         raise NotImplementedError("Sessions have been removed. Use stateless grounding.rag() calls.")

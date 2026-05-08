@@ -270,8 +270,11 @@ class MemoryClient:
     def __init__(self, owner: Latence) -> None:
         self._owner = owner
 
-    def step(self, **kwargs: Any) -> MemoryUpdateResponse:
-        raise NotImplementedError("Memory API has been removed.")
+    def step(self, **kwargs: Any) -> Any:
+        raise NotImplementedError(
+            "memory.step() has been removed in 0.2.0. "
+            "Use stateless grounding.rag() calls instead."
+        )
 
 
 class TraceSession:
@@ -293,8 +296,11 @@ class TraceSession:
         self.save()
         return event
 
-    def memory_step(self, **payload: Any) -> MemoryUpdateResponse:
-        raise NotImplementedError("Memory API has been removed.")
+    def memory_step(self, **payload: Any) -> Any:
+        raise NotImplementedError(
+            "memory_step() has been removed in 0.2.0. "
+            "Use stateless grounding.rag() calls instead."
+        )
 
     def _chain_memory(self, response: GroundednessResponse) -> None:
         raise NotImplementedError("Memory API has been removed.")
@@ -327,8 +333,11 @@ class TraceSession:
     def code(self, **kwargs: Any) -> GroundednessResponse:
         raise NotImplementedError("Code scoring has been removed. Use .rag() instead.")
 
-    def rollup(self, **options: Any) -> Mapping[str, Any]:
-        return self._owner.rollup(normalize_events(self.events), **options)
+    def rollup(self, **options: Any) -> Any:
+        raise NotImplementedError(
+            "rollup() has been removed in 0.2.0. "
+            "Use stateless grounding.rag() calls instead."
+        )
 
     def snapshot(self) -> TraceSessionSnapshot:
         return TraceSessionSnapshot(
@@ -530,37 +539,11 @@ class Latence:
             expected_model=ComplianceRedactionResponse,
         )
 
-    def rollup(
-        self,
-        turns: Sequence[Mapping[str, Any]],
-        *,
-        as_model: bool = False,
-        **options: Any,
-    ) -> RollupResponse | Mapping[str, Any]:
-        """Aggregate session-level rollup metrics.
-
-        Returns a :class:`RollupResponse` when ``as_model=True`` (or
-        the deployment is RunPod and a typed model can be parsed
-        cleanly); otherwise returns the raw mapping as before for
-        back-compat with 0.1.x callers.
-
-        REST and RunPod transports historically disagreed on the wire
-        shape — REST returned the metrics at JSON root while RunPod
-        nested them under ``"rollup"``. We normalize the RunPod shape
-        before returning so callers see the same dict regardless of
-        transport.
-        """
-
-        body = self._request(
-            "POST",
-            "/groundedness/rollup",
-            json={"turns": list(turns), **options},
-            expected_model=None,
+    def rollup(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError(
+            "rollup() has been removed in 0.2.0. "
+            "Use stateless grounding.rag() calls instead."
         )
-        normalized = _normalize_rollup_body(body)
-        if as_model:
-            return RollupResponse.model_validate({**normalized, "raw": body})
-        return normalized
 
     def session(self, **kwargs: Any) -> TraceSession:
         raise NotImplementedError("Sessions have been removed. Use stateless grounding.rag() calls.")

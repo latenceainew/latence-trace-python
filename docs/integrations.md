@@ -60,7 +60,7 @@ Every adapter should do the same four things:
 1. Extract the user query or task.
 2. Extract the candidate model response.
 3. Extract retrieved context, code context, or tool evidence.
-4. Call `client.grounding.rag(...)` or `client.grounding.code(...)` through the shared integration helper.
+4. Call `client.grounding.rag(...)` through the shared integration helper.
 
 Keep TRACE decisions explicit in your app state. That makes routing, logs,
 reviews, retries, and replay tests straightforward.

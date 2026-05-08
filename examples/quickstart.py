@@ -7,8 +7,7 @@ from latence import Latence
 
 def main() -> None:
     with Latence(
-        base_url="http://localhost:8090",
-        api_key=None,  # set via LATENCE_TRACE_API_KEY in production
+        base_url="https://api.latence.ai",
     ) as client:
         result = client.grounding.rag(
             query="When was Newton born?",

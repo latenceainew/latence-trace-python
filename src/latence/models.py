@@ -469,13 +469,14 @@ class ComplianceEntity(BaseModel):
 
 class ComplianceUsage(BaseModel):
     model_config = ConfigDict(extra="allow")
-    chunks_processed: int
-    labels_used: int
+    chunks_processed: int = 0
+    labels_used: int = 0
     entity_count: int = 0
     unique_labels: list[str] = Field(default_factory=list)
     redaction_mode: ComplianceRedactionMode | None = None
     redacted: bool = False
-    mode: ComplianceLabelMode
+    mode: ComplianceLabelMode | None = None
+    label_mode: ComplianceLabelMode | None = None
     categories: list[str] = Field(default_factory=list)
 
 
@@ -500,16 +501,16 @@ class ComplianceRedactionResponse(BaseModel):
     success: bool = True
     original_text: str | None = None
     entities: list[ComplianceEntity] = Field(default_factory=list)
-    entity_count: int
+    entity_count: int = 0
     unique_labels: list[str] = Field(default_factory=list)
     redacted_text: str | None = None
-    chunks_processed: int
+    chunks_processed: int = 0
     labels_used: list[str] = Field(default_factory=list)
-    label_mode: ComplianceLabelMode
+    label_mode: ComplianceLabelMode | None = None
     selected_categories: list[str] = Field(default_factory=list)
-    processing_time_ms: float
+    processing_time_ms: float = 0.0
     timings_ms: Mapping[str, float] = Field(default_factory=dict)
-    usage: ComplianceUsage
+    usage: ComplianceUsage | None = None
 
 
 class CompressionSpan(BaseModel):
@@ -522,7 +523,7 @@ class CompressionSpan(BaseModel):
 
 class CompressionResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
-    compressed_text: str
+    compressed_text: str = ""
     original_tokens: int | None = None
     compressed_tokens: int | None = None
     compression_ratio: float | None = None
